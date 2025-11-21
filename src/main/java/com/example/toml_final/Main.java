@@ -108,15 +108,13 @@ public class Main extends Application {
     // --- THREAD 2: The Render Loop ---
     private void render() {
         // Safety: Grab a local reference to the current player list.
-        // If 'finishLevel' swaps the list halfway through this method,
-        // we continue drawing the 'old' list for this one frame, preventing crashes.
-        List<Player> playersToDraw = players;
+        List<Player> allPlayers = players;
 
         // Clear screen
         gc.setFill(Color.BLACK);
         gc.fillRect(0, 0, gameCanvas.getWidth(), gameCanvas.getHeight());
 
-        if (levels.isEmpty()) return; // Safety check
+        if (levels.isEmpty()) return;
         Level level = levels.get(currentLevelIndex);
         Rectangle2D kz = level.getKillZone();
 
@@ -133,9 +131,37 @@ public class Main extends Application {
             p.draw(gc);
         }
 
-        // Draw Players
-        if (playersToDraw != null) {
-            for (Player p : playersToDraw) {
+        // --- NEW RENDERING LOGIC ---
+        if (allPlayers != null) {
+
+            // 1. Separate Alive vs Dead to handle Z-Indexing and Coloring
+            List<Player> alivePlayers = new ArrayList<>();
+            List<Player> deadPlayers = new ArrayList<>();
+
+            for (Player p : allPlayers) {
+                if (p.isAlive()) alivePlayers.add(p);
+                else deadPlayers.add(p);
+            }
+
+            // 2. Draw Dead Players First (Background layer)
+            for (Player p : deadPlayers) {
+                p.draw(gc);
+            }
+
+            // 3. Sort Alive Players by Score (Worst -> Best)
+            // This allows us to do Rank-Based coloring
+            alivePlayers.sort((p1, p2) -> Float.compare(p1.getBrain().getScore(), p2.getBrain().getScore()));
+
+            // 4. Draw Alive Players (Foreground layer)
+            int count = alivePlayers.size();
+            for (int i = 0; i < count; i++) {
+                Player p = alivePlayers.get(i);
+
+                // Rank Normalization: 0.0 (Worst Rank) to 1.0 (Best Rank)
+                // Use (count > 1) check to avoid divide by zero if only 1 survivor
+                double rank = (count > 1) ? (double) i / (count - 1) : 1.0;
+
+                p.updateColorBasedOnScore(rank);
                 p.draw(gc);
             }
         }
@@ -143,17 +169,18 @@ public class Main extends Application {
         // Draw Info Text
         gc.setFill(Color.WHITE);
         gc.setFont(new Font("Arial", INFO_PANE_HEIGHT));
-        gc.fillText("Gen " + currentGenNum + ", Lvl " + (currentLevelIndex+1) + ", Step " + currentStep, 10, INFO_PANE_HEIGHT);
+        gc.fillText("Gen " + currentGenNum + ", Lvl " + (currentLevelIndex + 1) + ", Step " + currentStep, 10, INFO_PANE_HEIGHT);
 
         // --- Draw Network ---
+        // (This section remains unchanged)
         netGc.setFill(Color.rgb(30, 30, 30));
         netGc.fillRect(0, 0, networkCanvas.getWidth(), networkCanvas.getHeight());
 
         Player bestPlayer = null;
         float maxScore = -Float.MAX_VALUE;
 
-        if (playersToDraw != null) {
-            for (Player p : playersToDraw) {
+        if (allPlayers != null) {
+            for (Player p : allPlayers) {
                 float score = p.getBrain().getScore();
                 if (score > maxScore) {
                     maxScore = score;
@@ -235,7 +262,7 @@ public class Main extends Application {
         // 1. Calculate Scores
         currentPlayers.parallelStream().forEach(p -> {
             double distToGoal = level.getGoal().subtract(p.getPos()).magnitude();
-            double penalty = (distToGoal / 2.5) + p.getMinDistToGoal();
+            double penalty = ((distToGoal / 2.5) + p.getMinDistToGoal())/3;
             p.getBrain().changeScore(-penalty);
         });
 

@@ -247,7 +247,29 @@ public class Player extends GameObj{
         }
     }
 
+    /**
+     * Updates the player's color based on their performance relative to the generation.
+     * @param normalizedScore A value between 0.0 (Worst) and 1.0 (Best).
+     */
+    public void updateColorBasedOnScore(double normalizedScore) {
+        if (!isAlive) {
+            // Keep dead color if dead
+            setColor(DEAD_COLOR);
+            return;
+        }
 
+        // Clamp value just in case
+        normalizedScore = Math.max(0, Math.min(1, normalizedScore));
+
+        // HSB Color Model:
+        // Hue 0 = Red, Hue 60 = Yellow, Hue 120 = Green.
+        // We map our 0.0-1.0 score to the 0-120 Hue range.
+        double hue = normalizedScore * 120;
+
+        // Saturation 1.0 (Vibrant), Brightness 1.0 (Bright)
+        // Opacity 0.8 (Slightly transparent to see stacking agents)
+        setColor(Color.hsb(hue, 1.0, 1.0, 0.8));
+    }
 
 
     /*
