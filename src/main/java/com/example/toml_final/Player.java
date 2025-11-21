@@ -5,6 +5,9 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Player extends GameObj{
     private static final double MOVEMENT_THRESHOLD = 0.2;
     private static final double JUMP_THRESHOLD = 0.2;
@@ -22,6 +25,8 @@ public class Player extends GameObj{
     private boolean isOnGround = false;
     private double minDistToGoal = Double.MAX_VALUE;
     private boolean isAlive = true;
+
+    private List<Platform> touched_platforms = new ArrayList<>();
 
     private record RayHit(double distance, Platform object) {}
 
@@ -141,9 +146,11 @@ public class Player extends GameObj{
         double newVelX = vel.x();
 
         if (isOnGround) {
-            newVelX *= 0.1;
             if (Math.abs(horizontal) > MOVEMENT_THRESHOLD) {
                 newVelX += horizontal * 20;
+            } else {
+                newVelX *= 0.1;
+
             }
         } else {
             if (Math.abs(horizontal) > MOVEMENT_THRESHOLD) {
@@ -221,6 +228,10 @@ public class Player extends GameObj{
                 if (vel.y() >= 0) {
                     this.pos = new Vector(pos.x(), obs.getPos().y() - this.getDim().y());
                     isOnGround = true;
+                    if (!touched_platforms.contains(obs)) {
+                        touched_platforms.add(obs);
+                        brain.changeScore(50);
+                    }
                 } else {
                     this.pos = new Vector(pos.x(), obs.getPos().y() + obs.getDim().y());
                 }
@@ -235,6 +246,8 @@ public class Player extends GameObj{
             minDistToGoal = distToGoal;
         }
     }
+
+
 
 
     /*

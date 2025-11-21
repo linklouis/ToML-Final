@@ -220,7 +220,7 @@ public class Main extends Application {
                 double distToGoal = currentLevel.getGoal().subtract(p.center()).magnitude();
                 if (distToGoal <= 10) {
                     p.die();
-                    p.getBrain().changeScore(300);
+                    p.getBrain().changeScore(300);  // Adds 200 since dying removes 100
                 }
             }
         });
