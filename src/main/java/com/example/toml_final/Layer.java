@@ -123,4 +123,12 @@ public class Layer {
         if (weights.length == 0) return 0;
         return weights[0].length - 1;
     }
+
+    public float[][] getWeights() {
+        return weights;
+    }
+
+    public Layer getNext() {
+        return next;
+    }
 }

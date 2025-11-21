@@ -23,7 +23,7 @@ public class Main extends Application {
     private static final int WIDTH = 600;
     private static final int HEIGHT = 400;
     private static final int INFO_PANE_HEIGHT = 15;
-    private static final int RENDER_EVERY_N_STEPS = 20;
+    private static final int RENDER_EVERY_N_STEPS = 1;
     private static final int MAX_STEPS_PER_LEVEL = 2500;
     private static final int NUM_GENS = 1000;
 
@@ -40,6 +40,8 @@ public class Main extends Application {
     private Canvas gameCanvas;
     private Canvas networkCanvas; // Placeholder for network visualization
     private GraphicsContext gc;
+    private GraphicsContext netGc;
+
 
     @Override
     public void start(@NotNull Stage stage) {
@@ -49,6 +51,7 @@ public class Main extends Application {
         networkCanvas = new Canvas(400, HEIGHT); // Placeholder size
 
         gc = gameCanvas.getGraphicsContext2D();
+        netGc = networkCanvas.getGraphicsContext2D();
 
         root.getChildren().addAll(gameCanvas, networkCanvas); // Side by side
 
@@ -91,7 +94,7 @@ public class Main extends Application {
         template.newLayer(2, ActivationFunction.sigmoid()); // Output: Horizontal, Jump
 
         // Initialize Generation
-        generation = new Generation(template, 120, 12, 0.1, 0.2);
+        generation = new Generation(template, 2000, 100, 0.15, 0.25);
 
         createLevels();
 
@@ -183,9 +186,9 @@ public class Main extends Application {
         Level level = levels.get(currentLevelIndex);
 
         // Draw Kill Zone
-//        Rectangle2D kz = level.getKillZone();
-//        gc.setFill(Color.rgb(100, 100, 100, 0.4)); // Transparent grey
-//        gc.fillRect(kz.getMinX(), kz.getMinY(), kz.getWidth(), kz.getHeight());
+        Rectangle2D kz = level.getKillZone();
+        gc.setFill(Color.rgb(100, 100, 100, 0.4));
+        gc.fillRect(kz.getMinX(), kz.getMinY(), kz.getWidth(), kz.getHeight());
 
         // Draw Goal
         gc.setFill(Color.LIME);
@@ -205,6 +208,41 @@ public class Main extends Application {
         gc.setFill(Color.WHITE);
         gc.setFont(new Font("Arial", INFO_PANE_HEIGHT));
         gc.fillText("Gen " + currentGenNum + ", Lvl " + (currentLevelIndex+1), 10, INFO_PANE_HEIGHT);
+
+
+        // Clear Network Canvas
+        netGc.setFill(Color.rgb(30, 30, 30)); // Dark Grey Background
+        netGc.fillRect(0, 0, networkCanvas.getWidth(), networkCanvas.getHeight());
+
+        // Find the player with the highest score
+        Player bestPlayer = null;
+        float maxScore = -Float.MAX_VALUE;
+
+        for (Player p : players) {
+            // Note: Since we penalize on death, "Alive" players will naturally
+            // have higher scores (0) than Dead players (-100).
+            float score = p.getBrain().getScore();
+            if (score > maxScore) {
+                maxScore = score;
+                bestPlayer = p;
+            }
+        }
+
+        // Draw the best player's brain
+        if (bestPlayer != null) {
+            // Label the network
+            netGc.setFill(Color.WHITE);
+            netGc.fillText("Best Agent Score: " + String.format("%.2f", maxScore), 10, 15);
+
+            // Use the display method we added to NeuralNetwork
+            bestPlayer.getBrain().getNetwork().display(netGc, networkCanvas.getWidth(), networkCanvas.getHeight());
+
+            // Optional: Highlight the best player in the game view so we know who we are looking at
+            gc.setStroke(Color.CYAN);
+            gc.setLineWidth(2);
+            gc.strokeRect(bestPlayer.getPos().x() - 2, bestPlayer.getPos().y() - 2,
+                    bestPlayer.getDim().x() + 4, bestPlayer.getDim().y() + 4);
+        }
     }
 
     // --- Level Creation (Porting the Python Lists) ---

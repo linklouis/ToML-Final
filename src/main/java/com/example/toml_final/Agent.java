@@ -33,4 +33,8 @@ public class Agent {
     public void changeScore(double change) {
         score += (float) change;
     }
+
+    public NeuralNetwork getNetwork() {
+        return network;
+    }
 }
