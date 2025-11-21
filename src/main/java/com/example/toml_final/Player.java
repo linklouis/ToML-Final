@@ -9,7 +9,7 @@ public class Player extends GameObj{
     private static final double MOVEMENT_THRESHOLD = 0.2;
     private static final double JUMP_THRESHOLD = 0.2;
     private static final double G = 9.8;
-    private static final double FPS = 30;
+    private static final double FPS = 60;
     private static final double MAX_RAY_DISTANCE = 500.0;
     private static final double MAX_JUMP = 40;
     private static final double JUMP_STRENGTH = 40;
@@ -51,9 +51,9 @@ public class Player extends GameObj{
     }
 
     public float[] getInputs(Platform[] obstacles, Vector goalPos) {
-        Vector origin = this.center(); // Assuming center() exists, or use pos + dim/2
+        Vector origin = this.center();
 
-        int numRays = 9;
+        int numRays = 16;
         float[] inputs = new float[(numRays * 3) + 7]; // 3 inputs per ray + 7 state inputs
         int index = 0;
 
@@ -69,8 +69,6 @@ public class Player extends GameObj{
 
             // Input B & C: Type Inputs (One-Hot encoding style)
             if (hit.object != null) {
-                // Assuming GameObj has a way to check type, e.g., an enum or string
-                // You might need to adjust 'isKill()' to match your GameObj implementation
                 boolean isDangerous = hit.object.getType() == Platform.Type.KILL;
 
                 inputs[index++] = 1.0f; // It is solid
@@ -88,7 +86,7 @@ public class Player extends GameObj{
 
         RayHit losHit = castRay(origin, dirToGoal, obstacles);
 
-        // If we hit something and that thing is CLOSER than the goal, view is blocked
+        // If we hit something and that thing is closer than the goal, view is blocked
         double lineOfSight = 1.0;
         if (losHit.distance < distToGoal && losHit.object != null && losHit.object.getType() != Platform.Type.KILL) {
             lineOfSight = -1.0;
@@ -96,8 +94,8 @@ public class Player extends GameObj{
 
         // --- 3. State Inputs ---
         // Clamp values similar to np.clip
-        inputs[index++] = (float) clamp(this.vel.x() / MAX_MOVE_SPEED, -1, 1);
-        inputs[index++] = (float) clamp(this.vel.y() / MAX_JUMP, -1, 1);
+        inputs[index++] = (float) Math.clamp(this.vel.x() / MAX_MOVE_SPEED, -1, 1);
+        inputs[index++] = (float) Math.clamp(this.vel.y() / MAX_JUMP, -1, 1);
         inputs[index++] = isOnGround ? 1.0f : 0.0f;
 
         // Normalized vector to goal
@@ -113,10 +111,135 @@ public class Player extends GameObj{
         return inputs;
     }
 
-    // Helper for Math.clamp (available in newer Java, but good to have explicitly)
-    private double clamp(double val, double min, double max) {
-        return Math.max(min, Math.min(max, val));
+
+    /**
+     * Set the alive flag to false, change the color, and subtract 100 points.
+     */
+    public void die() {
+        isAlive = false;
+        brain.changeScore(-100);
+        this.setColor(DEAD_COLOR);
     }
+
+    /**
+     * Set alive flag to true, change the color, reset the distance to goal counter,
+     * and set velocity to 9.8 down(to hopefully prevent issues with teleporting when spawning inside platforms).
+     */
+    public void revive() {
+        isAlive = true;
+        this.setColor(ALIVE_COLOR);
+        vel = new Vector(0, 9.8);
+        minDistToGoal = Double.MAX_VALUE;
+    }
+
+    public void update(Platform[] obstacles, Vector goalPos) {
+        float[] output = brain.predict(getInputs(obstacles, goalPos));
+        float horizontal = output[0];
+        float jump = output[1];
+
+        // --- X AXIS PHYSICS ---
+        double newVelX = vel.x();
+
+        if (isOnGround) {
+            newVelX *= 0.1;
+            if (Math.abs(horizontal) > MOVEMENT_THRESHOLD) {
+                newVelX += horizontal * 20;
+            }
+        } else {
+            if (Math.abs(horizontal) > MOVEMENT_THRESHOLD) {
+                newVelX += horizontal / 4;
+            }
+            newVelX *= 0.98;
+        }
+
+        newVelX = Math.clamp(newVelX, -MAX_MOVE_SPEED, MAX_MOVE_SPEED);
+        vel = new Vector(newVelX, vel.y());
+
+        // Move X
+        this.pos = new Vector(pos.x() + vel.x() / FPS, pos.y());
+
+        // --- X AXIS COLLISIONS ---
+        for (Platform obs : obstacles) {
+            if (checkCollision(this, obs)) {
+                if (obs.getType() == Platform.Type.KILL) {
+                    die();
+                    return;
+                }
+
+                // Calculate overlap on both axes
+                double overlapX = Math.min(this.right(), obs.right()) - Math.max(this.left(), obs.left());
+                double overlapY = Math.min(this.bottom(), obs.bottom()) - Math.max(this.top(), obs.top());
+
+                // If the Y overlap is significantly smaller than X overlap,
+                // we are just skimming the surface (floor/ceiling).
+                // Ignore this collision in the X-loop; let the Y-loop handle it.
+                if (overlapY < overlapX) {
+                    continue;
+                }
+
+                if (vel.x() > 0) {
+                    this.pos = new Vector(obs.getPos().x() - this.getDim().x(), pos.y());
+                } else if (vel.x() < 0) {
+                    this.pos = new Vector(obs.getPos().x() + obs.getDim().x(), pos.y());
+                }
+
+                vel = new Vector(0, vel.y());
+            }
+        }
+
+        // --- Y AXIS PHYSICS ---
+        vel = new Vector(vel.x(), vel.y() + G / FPS);
+
+        if (isOnGround && jump > JUMP_THRESHOLD) {
+            vel = new Vector(vel.x(), -JUMP_STRENGTH * jump);
+            isOnGround = false;
+        }
+
+        this.pos = new Vector(pos.x(), pos.y() + vel.y() / FPS);
+
+        // --- Y AXIS COLLISIONS ---
+        isOnGround = false;
+
+        for (Platform obs : obstacles) {
+            if (checkCollision(this, obs)) {
+                if (obs.getType() == Platform.Type.KILL) {
+                    die();
+                    return;
+                }
+                // We need the same overlap logic here that we used in the X loop,
+                // but inverted. We want to ignore "Walls" while calculating "Floors/Ceilings".
+
+                double overlapX = Math.min(this.right(), obs.right()) - Math.max(this.left(), obs.left());
+                double overlapY = Math.min(this.bottom(), obs.bottom()) - Math.max(this.top(), obs.top());
+
+                // If the X overlap is smaller than the Y overlap, it's a Wall hit.
+                // Ignore it in this Y-loop (the X-loop handled it already).
+                if (overlapX < overlapY) {
+                    continue;
+                }
+
+                if (vel.y() >= 0) {
+                    this.pos = new Vector(pos.x(), obs.getPos().y() - this.getDim().y());
+                    isOnGround = true;
+                } else {
+                    this.pos = new Vector(pos.x(), obs.getPos().y() + obs.getDim().y());
+                }
+
+                vel = new Vector(vel.x(), 0);
+            }
+        }
+
+        // --- GOAL TRACKING ---
+        double distToGoal = goalPos.subtract(this.pos).magnitude();
+        if (distToGoal < minDistToGoal) {
+            minDistToGoal = distToGoal;
+        }
+    }
+
+
+    /*
+     * Utilities
+     */
 
     /**
      * Helper: Standard Ray vs AABB (Axis Aligned Bounding Box) intersection.
@@ -158,131 +281,6 @@ public class Player extends GameObj{
                 a.getPos().x() + a.getDim().x() > b.getPos().x() &&
                 a.getPos().y() < b.getPos().y() + b.getDim().y() &&
                 a.getPos().y() + a.getDim().y() > b.getPos().y();
-    }
-
-    public void die() {
-        isAlive = false;
-        brain.changeScore(-100);
-        this.setColor(DEAD_COLOR);
-    }
-
-    public void revive() {
-        isAlive = true;
-        this.setColor(ALIVE_COLOR);
-        vel = new Vector(0, 0);
-        minDistToGoal = Double.MAX_VALUE;
-    }
-
-    public void update(Platform[] obstacles, Vector goalPos) {
-        float[] output = brain.predict(getInputs(obstacles, goalPos));
-        float horizontal = output[0];
-        float jump = output[1];
-
-        // --- X AXIS PHYSICS ---
-        double newVelX = vel.x();
-
-        if (isOnGround) {
-            newVelX *= 0.1;
-            if (Math.abs(horizontal) > MOVEMENT_THRESHOLD) {
-                newVelX += horizontal * 20;
-            }
-        } else {
-            if (Math.abs(horizontal) > MOVEMENT_THRESHOLD) {
-                newVelX += horizontal / 4;
-            }
-            newVelX *= 0.98;
-        }
-
-        newVelX = clamp(newVelX, -MAX_MOVE_SPEED, MAX_MOVE_SPEED);
-        vel = new Vector(newVelX, vel.y());
-
-        // Move X
-        this.pos = new Vector(pos.x() + vel.x() / FPS, pos.y());
-
-        // --- X AXIS COLLISIONS ---
-        for (Platform obs : obstacles) {
-            if (checkCollision(this, obs)) {
-                if (obs.getType() == Platform.Type.KILL) {
-                    die();
-                    return;
-                }
-
-                // --- FIX STARTS HERE ---
-                // Calculate overlap on both axes
-                double overlapX = Math.min(this.right(), obs.right()) - Math.max(this.left(), obs.left());
-                double overlapY = Math.min(this.bottom(), obs.bottom()) - Math.max(this.top(), obs.top());
-
-                // If the Y overlap is significantly smaller than X overlap,
-                // we are just skimming the surface (floor/ceiling).
-                // Ignore this collision in the X-loop; let the Y-loop handle it.
-                if (overlapY < overlapX) {
-                    continue;
-                }
-                // --- FIX ENDS HERE ---
-
-                if (vel.x() > 0) {
-                    this.pos = new Vector(obs.getPos().x() - this.getDim().x(), pos.y());
-                } else if (vel.x() < 0) {
-                    this.pos = new Vector(obs.getPos().x() + obs.getDim().x(), pos.y());
-                }
-
-                vel = new Vector(0, vel.y());
-            }
-        }
-
-        // --- Y AXIS PHYSICS ---
-        // (The rest of the method remains exactly the same)
-        vel = new Vector(vel.x(), vel.y() + G / FPS);
-
-        if (isOnGround && jump > JUMP_THRESHOLD) {
-            vel = new Vector(vel.x(), -JUMP_STRENGTH * jump);
-            isOnGround = false;
-        }
-
-        this.pos = new Vector(pos.x(), pos.y() + vel.y() / FPS);
-
-        // --- Y AXIS COLLISIONS ---
-        isOnGround = false;
-
-        for (Platform obs : obstacles) {
-            if (checkCollision(this, obs)) {
-                if (obs.getType() == Platform.Type.KILL) {
-                    die();
-                    return;
-                }
-
-                // --- FIX STARTS HERE ---
-                // We need the same overlap logic here that we used in the X loop,
-                // but inverted. We want to ignore "Walls" while calculating "Floors/Ceilings".
-
-                double overlapX = Math.min(this.right(), obs.right()) - Math.max(this.left(), obs.left());
-                double overlapY = Math.min(this.bottom(), obs.bottom()) - Math.max(this.top(), obs.top());
-
-                // If the X overlap is smaller than the Y overlap, it's a Wall hit.
-                // Ignore it in this Y-loop (the X-loop handled it already).
-                if (overlapX < overlapY) {
-                    continue;
-                }
-                // --- FIX ENDS HERE ---
-
-                if (vel.y() >= 0) {
-                    this.pos = new Vector(pos.x(), obs.getPos().y() - this.getDim().y());
-                    isOnGround = true;
-                } else {
-                    this.pos = new Vector(pos.x(), obs.getPos().y() + obs.getDim().y());
-                }
-
-                vel = new Vector(vel.x(), 0);
-            }
-        }
-
-        // --- GOAL TRACKING ---
-        double distToGoal = goalPos.subtract(this.pos).magnitude();
-        if (distToGoal < minDistToGoal) {
-            minDistToGoal = distToGoal;
-            // Update the agent's score here if needed, e.g.:
-            // brain.setScore(...);
-        }
     }
 
     public void setPos(Vector newPos) {

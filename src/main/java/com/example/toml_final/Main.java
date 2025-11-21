@@ -25,8 +25,13 @@ public class Main extends Application {
     private static final int INFO_PANE_HEIGHT = 15;
 
     // Physics Constants
-    private static final int MAX_STEPS_PER_LEVEL = 2500;
+    private static final int MAX_STEPS_PER_LEVEL = 4000;
     private static final int NUM_GENS = 1000;
+    private static final int NUM_AGENTS = 1000;
+    private static final double KEEP_RATE = 0.2;
+    private static final double MUTATION_CHANCE = 0.3;
+    private static final double MUTATION_SIZE = 0.4;
+    private static final int NUM_INPUTS = 55;
 
     // Game State (Volatile is crucial here for thread visibility)
     private Generation generation;
@@ -60,7 +65,7 @@ public class Main extends Application {
         root.getChildren().addAll(gameCanvas, networkCanvas);
 
         Scene scene = new Scene(root, WIDTH + 400, HEIGHT, Color.BLACK);
-        stage.setTitle("AI Platformer Training (Decoupled Threads)");
+        stage.setTitle("Final Project");
         stage.setScene(scene);
         stage.show();
 
@@ -73,15 +78,13 @@ public class Main extends Application {
         // 2. Initialize Logic
         initSimulation();
 
-        // 3. Start Physics Thread (The Brain)
-        // Runs as fast as CPU allows, completely independent of frame rate
+        // 3. Start Physics Thread
         Thread physicsThread = new Thread(this::physicsLoop);
         physicsThread.setDaemon(true);
-        physicsThread.setPriority(Thread.MAX_PRIORITY); // Give it CPU preference
+        physicsThread.setPriority(Thread.MAX_PRIORITY);
         physicsThread.start();
 
-        // 4. Start Render Thread (The Eyes)
-        // Runs at Monitor Refresh Rate (60Hz/144Hz)
+        // 4. Start Render Thread
         AnimationTimer renderLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
@@ -94,16 +97,11 @@ public class Main extends Application {
     // --- THREAD 1: The Physics Loop ---
     private void physicsLoop() {
         while (running && currentGenNum < NUM_GENS) {
-            // 1. Update Physics
             updatePhysics();
 
-            // 2. Check Logic conditions
             if (currentStep >= MAX_STEPS_PER_LEVEL) {
                 finishLevel();
             }
-
-            // No Thread.sleep() here.
-            // We want this to run 100,000 times a second if possible.
         }
     }
 
@@ -166,7 +164,7 @@ public class Main extends Application {
 
         if (bestPlayer != null) {
             netGc.setFill(Color.WHITE);
-            netGc.fillText("Best Agent Score: " + String.format("%.2f", maxScore), 10, 15);
+            netGc.fillText("Best Score: " + String.format("%.2f", maxScore), 280, 15);
             bestPlayer.getBrain().getNetwork().display(netGc, networkCanvas.getWidth(), networkCanvas.getHeight());
 
             gc.setStroke(Color.CYAN);
@@ -177,15 +175,16 @@ public class Main extends Application {
     }
 
     // ---------------------------------------------------------
-    // LOGIC METHODS (Run primarily on Physics Thread)
+    // LOGIC METHODS (Primarily Physics Thread stuff)
     // ---------------------------------------------------------
 
     private void initSimulation() {
-        NeuralNetwork template = new NeuralNetwork(34);
-        template.newLayer(28);
+        NeuralNetwork template = new NeuralNetwork(NUM_INPUTS);
+        template.newLayer(40);
+        template.newLayer(25);
         template.newLayer(2, ActivationFunction.sigmoid());
 
-        generation = new Generation(template, 2000, 100, 0.15, 0.25);
+        generation = new Generation(template, NUM_AGENTS, (int) (NUM_AGENTS*KEEP_RATE), MUTATION_CHANCE, MUTATION_SIZE);
 
         createLevels();
         players = populatePlayers(generation);
@@ -208,17 +207,21 @@ public class Main extends Application {
 
         // Parallel Stream for maximum physics throughput
         currentPlayers.parallelStream().forEach(p -> {
-            double distToGoal = currentLevel.getGoal().subtract(p.getPos()).magnitude();
-
-            if (p.isAlive() && distToGoal > 30) {
-                if (stepSnapshot > 730) {
+            if (p.isAlive()) {
+                if (stepSnapshot > 800) {
                     Rectangle2D kz = currentLevel.getKillZone();
                     if (p.getPos().x() < kz.getMaxX() && p.right() > kz.getMinX() &&
                             p.getPos().y() < kz.getMaxY() && p.bottom() > kz.getMinY()) {
                         p.die();
+                        p.getBrain().changeScore(70); // Only want them to lose ~30 points for not making it out of the starting area
                     }
                 }
                 p.update(currentLevel.getPlatforms(), currentLevel.getGoal());
+                double distToGoal = currentLevel.getGoal().subtract(p.center()).magnitude();
+                if (distToGoal <= 10) {
+                    p.die();
+                    p.getBrain().changeScore(300);
+                }
             }
         });
 
@@ -313,7 +316,7 @@ public class Main extends Application {
                 new Platform(new Vector(120, 110), new Vector(50, 10), Platform.Type.STANDARD),
                 new Platform(new Vector(0, 50), new Vector(90, 10), Platform.Type.STANDARD)
         };
-        Level l3 = new Level(l3_obs, new Vector(80, 10), new Vector(80, 325), null, null);
+        Level l3 = new Level(l3_obs, new Vector(80, 10), new Vector(80, 325), null, new Rectangle2D(0, 300, 170, 50));
 
         // Level 4
         Platform[] l4_obs = {
@@ -328,17 +331,26 @@ public class Main extends Application {
                 new Platform(new Vector(390, 190), new Vector(50, 50), Platform.Type.STANDARD),
                 new Platform(new Vector(500, 250), new Vector(50, 100), Platform.Type.STANDARD)
         };
-        Level l4 = new Level(l4_obs, new Vector(280, 170), new Vector(10, 325), new Vector(520, 225), new Rectangle2D(0, 0, 100, 400));
+        Level l4 = new Level(l4_obs, new Vector(280, 170), new Vector(10, 325), new Vector(520, 220), new Rectangle2D(0, 0, 100, 400));
+        Level l4a = new Level(l4_obs, new Vector(280, 170), new Vector(230, 273), new Vector(410, 273), new Rectangle2D(0, 0, 100, 400));
 
-        levels.add(l4);
-        levels.add(l4.getAlt());
-        levels.add(l1);
-        levels.add(l2);
-        levels.add(l3);
-        levels.add(l4.getReversed(WIDTH));
-        levels.add(l1.getReversed(WIDTH));
-        levels.add(l2.getReversed(WIDTH));
-        levels.add(l3.getReversed(WIDTH));
+
+        for (int i = 0; i < 2; i++) {
+            levels.add(l4);
+            levels.add(l4.getAlt());
+            levels.add(l4a);
+            levels.add(l4a.getAlt());
+            levels.add(l1);
+            levels.add(l2);
+            levels.add(l3);
+            levels.add(l4.getReversed(WIDTH));
+            levels.add(l4.getReversed(WIDTH).getAlt());
+            levels.add(l4a.getReversed(WIDTH));
+            levels.add(l4a.getReversed(WIDTH).getAlt());
+            levels.add(l1.getReversed(WIDTH));
+            levels.add(l2.getReversed(WIDTH));
+            levels.add(l3.getReversed(WIDTH));
+        }
     }
 
     static void main(String[] args) {
