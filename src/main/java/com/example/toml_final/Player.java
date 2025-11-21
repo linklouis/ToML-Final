@@ -235,7 +235,7 @@ public class Player extends GameObj{
         vel = new Vector(vel.x(), vel.y() + G / FPS);
 
         if (isOnGround && jump > JUMP_THRESHOLD) {
-            vel = new Vector(vel.x(), -JUMP_STRENGTH * (jump + 1)/2);
+            vel = new Vector(vel.x(), -JUMP_STRENGTH * jump);
             isOnGround = false;
         }
 
@@ -251,9 +251,19 @@ public class Player extends GameObj{
                     return;
                 }
 
-                // Note: We do NOT need the overlap check here because the X-loop
-                // has already resolved horizontal issues. Any remaining collision
-                // MUST be vertical.
+                // --- FIX STARTS HERE ---
+                // We need the same overlap logic here that we used in the X loop,
+                // but inverted. We want to ignore "Walls" while calculating "Floors/Ceilings".
+
+                double overlapX = Math.min(this.right(), obs.right()) - Math.max(this.left(), obs.left());
+                double overlapY = Math.min(this.bottom(), obs.bottom()) - Math.max(this.top(), obs.top());
+
+                // If the X overlap is smaller than the Y overlap, it's a Wall hit.
+                // Ignore it in this Y-loop (the X-loop handled it already).
+                if (overlapX < overlapY) {
+                    continue;
+                }
+                // --- FIX ENDS HERE ---
 
                 if (vel.y() >= 0) {
                     this.pos = new Vector(pos.x(), obs.getPos().y() - this.getDim().y());

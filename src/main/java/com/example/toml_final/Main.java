@@ -1,5 +1,6 @@
 package com.example.toml_final;
 
+import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
@@ -15,7 +16,6 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Main extends Application {
 
@@ -24,20 +24,19 @@ public class Main extends Application {
     private static final int HEIGHT = 400;
     private static final int INFO_PANE_HEIGHT = 15;
 
-    // Increase this if you want it even faster (less drawing, more math)
-    private static final int RENDER_EVERY_N_STEPS = 1;
+    // Physics Constants
     private static final int MAX_STEPS_PER_LEVEL = 2500;
     private static final int NUM_GENS = 1000;
 
-    // Game State
+    // Game State (Volatile is crucial here for thread visibility)
     private Generation generation;
-    // Volatile ensures threads see the most up-to-date list reference
-    private volatile List<Player> players;
+    private volatile List<Player> players; // Renderer reads this, Physics writes this
     private List<Level> levels;
 
-    private int currentGenNum = 0;
-    private int currentLevelIndex = 0;
-    private int currentStep = 0;
+    // Shared primitives need to be volatile or atomic if written by one and read by another
+    private volatile int currentGenNum = 0;
+    private volatile int currentLevelIndex = 0;
+    private volatile int currentStep = 0;
 
     // Rendering
     private Canvas gameCanvas;
@@ -45,9 +44,8 @@ public class Main extends Application {
     private GraphicsContext gc;
     private GraphicsContext netGc;
 
-    // Thread Safety for rendering
-    private final AtomicBoolean isRendering = new AtomicBoolean(false);
-    private boolean running = true; // Flag to stop thread on close
+    // Lifecycle
+    private boolean running = true;
 
     @Override
     public void start(@NotNull Stage stage) {
@@ -62,141 +60,65 @@ public class Main extends Application {
         root.getChildren().addAll(gameCanvas, networkCanvas);
 
         Scene scene = new Scene(root, WIDTH + 400, HEIGHT, Color.BLACK);
-        stage.setTitle("AI Platformer Training (Unlimited Speed)");
+        stage.setTitle("AI Platformer Training (Decoupled Threads)");
         stage.setScene(scene);
         stage.show();
 
-        // Ensure thread stops when window closes
-        stage.setOnCloseRequest(e -> running = false);
+        // Stop everything when window closes
+        stage.setOnCloseRequest(e -> {
+            running = false;
+            System.exit(0);
+        });
 
         // 2. Initialize Logic
         initSimulation();
 
-        // 3. Start Background Thread
-        // This replaces AnimationTimer
-        Thread simThread = new Thread(this::simulationLoop);
-        simThread.setDaemon(true); // Kills thread if main app dies
-        simThread.start();
+        // 3. Start Physics Thread (The Brain)
+        // Runs as fast as CPU allows, completely independent of frame rate
+        Thread physicsThread = new Thread(this::physicsLoop);
+        physicsThread.setDaemon(true);
+        physicsThread.setPriority(Thread.MAX_PRIORITY); // Give it CPU preference
+        physicsThread.start();
+
+        // 4. Start Render Thread (The Eyes)
+        // Runs at Monitor Refresh Rate (60Hz/144Hz)
+        AnimationTimer renderLoop = new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                render();
+            }
+        };
+        renderLoop.start();
     }
 
-    private void simulationLoop() {
+    // --- THREAD 1: The Physics Loop ---
+    private void physicsLoop() {
         while (running && currentGenNum < NUM_GENS) {
-            // Run physics batch
-            for (int i = 0; i < RENDER_EVERY_N_STEPS; i++) {
-                updatePhysics();
+            // 1. Update Physics
+            updatePhysics();
 
-                // Check if level or generation ended inside the physics loop
-                if (currentStep >= MAX_STEPS_PER_LEVEL) {
-                    finishLevel();
-                    break;
-                }
+            // 2. Check Logic conditions
+            if (currentStep >= MAX_STEPS_PER_LEVEL) {
+                finishLevel();
             }
 
-            // Request a Render Frame
-            // We only schedule a render if the UI isn't already busy rendering.
-            // This prevents flooding the JavaFX event queue and crashing the app.
-            if (!isRendering.get()) {
-                isRendering.set(true);
-                javafx.application.Platform.runLater(() -> {
-                    render();
-                    isRendering.set(false);
-                });
-            }
-
-            // Optional: Minimal sleep to prevent CPU starvation on single-core systems
-            // (Modern OS usually handles this fine without sleep, but it's good practice)
-            try { Thread.sleep(1); } catch (InterruptedException ignored) {}
+            // No Thread.sleep() here.
+            // We want this to run 100,000 times a second if possible.
         }
     }
 
-    private void initSimulation() {
-        // Inputs: 9 rays * 3 data points + 7 state vars = 34 inputs
-        NeuralNetwork template = new NeuralNetwork(34);
-        template.newLayer(28);
-        template.newLayer(2, ActivationFunction.sigmoid());
-
-        // Initialize Generation
-        generation = new Generation(template, 2000, 100, 0.15, 0.25);
-
-        createLevels();
-        players = populatePlayers(generation);
-        resetPlayers(levels.getFirst().getSpawnPos());
-    }
-
-    private @NotNull List<Player> populatePlayers(@NotNull Generation gen) {
-        List<Player> newPlayers = new ArrayList<>();
-        for (int i = 0; i < gen.getSize(); i++) {
-            newPlayers.add(new Player(new Vector(0, 0), new Vector(10, 25), gen.getAgents()[i]));
-        }
-        return newPlayers;
-    }
-
-    private void updatePhysics() {
-        Level currentLevel = levels.get(currentLevelIndex);
-
-        // Note: We iterate a local reference to avoid race conditions if players are reset
-        List<Player> currentPlayers = players;
-
-        for (Player p : currentPlayers) {
-            double distToGoal = currentLevel.getGoal().subtract(p.getPos()).magnitude();
-            if (p.isAlive() && distToGoal > 30) {
-                if (currentStep > 730) {
-                    Rectangle2D kz = currentLevel.getKillZone();
-                    if (p.getPos().x() < kz.getMaxX() && p.right() > kz.getMinX() &&
-                            p.getPos().y() < kz.getMaxY() && p.bottom() > kz.getMinY()) {
-                        p.die();
-                    }
-                }
-                p.update(currentLevel.getPlatforms(), currentLevel.getGoal());
-            }
-        }
-        currentStep++;
-    }
-
-    private void finishLevel() {
-        Level level = levels.get(currentLevelIndex);
-        List<Player> currentPlayers = players;
-
-        // 1. Calculate Scores
-        for (Player p : currentPlayers) {
-            double distToGoal = level.getGoal().subtract(p.getPos()).magnitude();
-            double penalty = (distToGoal / 2.5) + p.getMinDistToGoal();
-            p.getBrain().changeScore(-penalty);
-        }
-
-        // 2. Advance Level
-        currentLevelIndex++;
-        currentStep = 0;
-
-        // 3. Check if Generation Done
-        if (currentLevelIndex >= levels.size()) {
-            generation = generation.nextGeneration();
-            players = populatePlayers(generation); // Replaces the list reference
-            currentLevelIndex = 0;
-            currentGenNum++;
-            System.out.println("NEW GEN! " + currentGenNum + "/" + NUM_GENS);
-        }
-
-        // 4. Reset Players for new level
-        resetPlayers(levels.get(currentLevelIndex).getSpawnPos());
-    }
-
-    private void resetPlayers(Vector spawn) {
-        Random rand = new Random();
-        List<Player> currentPlayers = players;
-        for (Player p : currentPlayers) {
-            double rx = spawn.x() + rand.nextDouble() * 2 - 1;
-            double ry = spawn.y() + rand.nextDouble() * 2 - 1;
-            p.setPos(new Vector(rx, ry));
-            p.revive();
-        }
-    }
-
+    // --- THREAD 2: The Render Loop ---
     private void render() {
+        // Safety: Grab a local reference to the current player list.
+        // If 'finishLevel' swaps the list halfway through this method,
+        // we continue drawing the 'old' list for this one frame, preventing crashes.
+        List<Player> playersToDraw = players;
+
         // Clear screen
         gc.setFill(Color.BLACK);
         gc.fillRect(0, 0, gameCanvas.getWidth(), gameCanvas.getHeight());
 
+        if (levels.isEmpty()) return; // Safety check
         Level level = levels.get(currentLevelIndex);
         Rectangle2D kz = level.getKillZone();
 
@@ -209,13 +131,11 @@ public class Main extends Application {
         gc.fillOval(level.getGoal().x(), level.getGoal().y(), 10, 10);
 
         // Draw Platforms
-        for (com.example.toml_final.Platform p : level.getPlatforms()) {
+        for (Platform p : level.getPlatforms()) {
             p.draw(gc);
         }
 
         // Draw Players
-        // Grab a local reference in case the background thread swaps the list
-        List<Player> playersToDraw = players;
         if (playersToDraw != null) {
             for (Player p : playersToDraw) {
                 p.draw(gc);
@@ -225,7 +145,7 @@ public class Main extends Application {
         // Draw Info Text
         gc.setFill(Color.WHITE);
         gc.setFont(new Font("Arial", INFO_PANE_HEIGHT));
-        gc.fillText("Gen " + currentGenNum + ", Lvl " + (currentLevelIndex+1), 10, INFO_PANE_HEIGHT);
+        gc.fillText("Gen " + currentGenNum + ", Lvl " + (currentLevelIndex+1) + ", Step " + currentStep, 10, INFO_PANE_HEIGHT);
 
         // --- Draw Network ---
         netGc.setFill(Color.rgb(30, 30, 30));
@@ -254,6 +174,99 @@ public class Main extends Application {
             gc.strokeRect(bestPlayer.getPos().x() - 2, bestPlayer.getPos().y() - 2,
                     bestPlayer.getDim().x() + 4, bestPlayer.getDim().y() + 4);
         }
+    }
+
+    // ---------------------------------------------------------
+    // LOGIC METHODS (Run primarily on Physics Thread)
+    // ---------------------------------------------------------
+
+    private void initSimulation() {
+        NeuralNetwork template = new NeuralNetwork(34);
+        template.newLayer(28);
+        template.newLayer(2, ActivationFunction.sigmoid());
+
+        generation = new Generation(template, 2000, 100, 0.15, 0.25);
+
+        createLevels();
+        players = populatePlayers(generation);
+        resetPlayers(levels.getFirst().getSpawnPos());
+    }
+
+    private @NotNull List<Player> populatePlayers(@NotNull Generation gen) {
+        List<Player> newPlayers = new ArrayList<>();
+        for (int i = 0; i < gen.getSize(); i++) {
+            newPlayers.add(new Player(new Vector(0, 0), new Vector(10, 25), gen.getAgents()[i]));
+        }
+        return newPlayers;
+    }
+
+    private void updatePhysics() {
+        // Grab local ref for thread safety
+        List<Player> currentPlayers = players;
+        Level currentLevel = levels.get(currentLevelIndex);
+        final int stepSnapshot = currentStep;
+
+        // Parallel Stream for maximum physics throughput
+        currentPlayers.parallelStream().forEach(p -> {
+            double distToGoal = currentLevel.getGoal().subtract(p.getPos()).magnitude();
+
+            if (p.isAlive() && distToGoal > 30) {
+                if (stepSnapshot > 730) {
+                    Rectangle2D kz = currentLevel.getKillZone();
+                    if (p.getPos().x() < kz.getMaxX() && p.right() > kz.getMinX() &&
+                            p.getPos().y() < kz.getMaxY() && p.bottom() > kz.getMinY()) {
+                        p.die();
+                    }
+                }
+                p.update(currentLevel.getPlatforms(), currentLevel.getGoal());
+            }
+        });
+
+        currentStep++;
+    }
+
+    private void finishLevel() {
+        Level level = levels.get(currentLevelIndex);
+        List<Player> currentPlayers = players;
+
+        // 1. Calculate Scores
+        currentPlayers.parallelStream().forEach(p -> {
+            double distToGoal = level.getGoal().subtract(p.getPos()).magnitude();
+            double penalty = (distToGoal / 2.5) + p.getMinDistToGoal();
+            p.getBrain().changeScore(-penalty);
+        });
+
+        // 2. Advance Level
+        currentLevelIndex++;
+        currentStep = 0;
+
+        // 3. Check if Generation Done
+        if (currentLevelIndex >= levels.size()) {
+            generation = generation.nextGeneration();
+            // ATOMIC SWAP: We create the new list completely, then assign it to the volatile field.
+            // This is the moment the Render thread switches to the new generation.
+            players = populatePlayers(generation);
+            currentLevelIndex = 0;
+            currentGenNum++;
+            System.out.println("NEW GEN! " + currentGenNum + "/" + NUM_GENS);
+        }
+
+        // 4. Reset Players
+        resetPlayers(levels.get(currentLevelIndex).getSpawnPos());
+    }
+
+    private void resetPlayers(Vector spawn) {
+        Random rand = new Random();
+        List<Player> currentPlayers = players;
+        // Parallel reset is safe as long as Random is thread-local or we create new ones
+        currentPlayers.parallelStream().forEach(p -> {
+            // Create a local Random to avoid contention on the shared Math.random()
+            java.util.concurrent.ThreadLocalRandom localRand = java.util.concurrent.ThreadLocalRandom.current();
+            double rx = spawn.x() + localRand.nextDouble() * 2 - 1;
+            double ry = spawn.y() + localRand.nextDouble() * 2 - 1;
+            p.setPos(new Vector(rx, ry));
+            p.revive();
+        });
     }
 
     private void createLevels() {

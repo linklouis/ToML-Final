@@ -89,7 +89,7 @@ public class NeuralNetwork {
             // Draw Input Circle (White)
             gc.setFill(javafx.scene.paint.Color.WHITE);
             // Python radius 2.5 * scale and 3 * scale - 1. We'll average to 3*scale.
-            double r = 3 * scale;
+            double r = 2 * scale;
             gc.fillOval(pos.x() - r, pos.y() - r, r * 2, r * 2);
         }
 
@@ -155,7 +155,7 @@ public class NeuralNetwork {
                     nodeColor = javafx.scene.paint.Color.rgb((int)Math.min(255, intensity), 0, 0);
                 }
 
-                double r = 3 * scale;
+                double r = 2 * scale;
                 gc.setFill(nodeColor);
                 gc.fillOval(curPos.x() - r, curPos.y() - r, r * 2, r * 2);
 
