@@ -235,7 +235,7 @@ public class Player extends GameObj{
         vel = new Vector(vel.x(), vel.y() + G / FPS);
 
         if (isOnGround && jump > JUMP_THRESHOLD) {
-            vel = new Vector(vel.x(), -JUMP_STRENGTH);
+            vel = new Vector(vel.x(), -JUMP_STRENGTH * (jump + 1)/2);
             isOnGround = false;
         }
 

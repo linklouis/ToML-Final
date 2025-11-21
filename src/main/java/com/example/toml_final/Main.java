@@ -1,6 +1,5 @@
 package com.example.toml_final;
 
-import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
@@ -16,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Main extends Application {
 
@@ -23,13 +23,16 @@ public class Main extends Application {
     private static final int WIDTH = 600;
     private static final int HEIGHT = 400;
     private static final int INFO_PANE_HEIGHT = 15;
+
+    // Increase this if you want it even faster (less drawing, more math)
     private static final int RENDER_EVERY_N_STEPS = 1;
     private static final int MAX_STEPS_PER_LEVEL = 2500;
     private static final int NUM_GENS = 1000;
 
     // Game State
     private Generation generation;
-    private List<Player> players;
+    // Volatile ensures threads see the most up-to-date list reference
+    private volatile List<Player> players;
     private List<Level> levels;
 
     private int currentGenNum = 0;
@@ -38,76 +41,90 @@ public class Main extends Application {
 
     // Rendering
     private Canvas gameCanvas;
-    private Canvas networkCanvas; // Placeholder for network visualization
+    private Canvas networkCanvas;
     private GraphicsContext gc;
     private GraphicsContext netGc;
 
+    // Thread Safety for rendering
+    private final AtomicBoolean isRendering = new AtomicBoolean(false);
+    private boolean running = true; // Flag to stop thread on close
 
     @Override
     public void start(@NotNull Stage stage) {
         // 1. Setup UI
         Pane root = new HBox();
         gameCanvas = new Canvas(WIDTH, HEIGHT);
-        networkCanvas = new Canvas(400, HEIGHT); // Placeholder size
+        networkCanvas = new Canvas(400, HEIGHT);
 
         gc = gameCanvas.getGraphicsContext2D();
         netGc = networkCanvas.getGraphicsContext2D();
 
-        root.getChildren().addAll(gameCanvas, networkCanvas); // Side by side
+        root.getChildren().addAll(gameCanvas, networkCanvas);
 
         Scene scene = new Scene(root, WIDTH + 400, HEIGHT, Color.BLACK);
-        stage.setTitle("AI Platformer Training");
+        stage.setTitle("AI Platformer Training (Unlimited Speed)");
         stage.setScene(scene);
         stage.show();
+
+        // Ensure thread stops when window closes
+        stage.setOnCloseRequest(e -> running = false);
 
         // 2. Initialize Logic
         initSimulation();
 
-        // 3. Start Game Loop
-        AnimationTimer timer = new AnimationTimer() {
-            @Override
-            public void handle(long now) {
-                if (currentGenNum < NUM_GENS) {
-                    // Run physics multiple times per frame to speed up training
-                    // This mimics "RENDER_EVERY_N_STEPS" by only drawing after this loop
-                    for (int i = 0; i < RENDER_EVERY_N_STEPS; i++) {
-                        updatePhysics();
+        // 3. Start Background Thread
+        // This replaces AnimationTimer
+        Thread simThread = new Thread(this::simulationLoop);
+        simThread.setDaemon(true); // Kills thread if main app dies
+        simThread.start();
+    }
 
-                        // Check if level or generation ended inside the physics loop
-                        if (currentStep >= MAX_STEPS_PER_LEVEL) {
-                            finishLevel();
-                            break;
-                        }
-                    }
-                    render();
+    private void simulationLoop() {
+        while (running && currentGenNum < NUM_GENS) {
+            // Run physics batch
+            for (int i = 0; i < RENDER_EVERY_N_STEPS; i++) {
+                updatePhysics();
+
+                // Check if level or generation ended inside the physics loop
+                if (currentStep >= MAX_STEPS_PER_LEVEL) {
+                    finishLevel();
+                    break;
                 }
             }
-        };
-        timer.start();
+
+            // Request a Render Frame
+            // We only schedule a render if the UI isn't already busy rendering.
+            // This prevents flooding the JavaFX event queue and crashing the app.
+            if (!isRendering.get()) {
+                isRendering.set(true);
+                javafx.application.Platform.runLater(() -> {
+                    render();
+                    isRendering.set(false);
+                });
+            }
+
+            // Optional: Minimal sleep to prevent CPU starvation on single-core systems
+            // (Modern OS usually handles this fine without sleep, but it's good practice)
+            try { Thread.sleep(1); } catch (InterruptedException ignored) {}
+        }
     }
 
     private void initSimulation() {
-        // Setup Neural Network Template
         // Inputs: 9 rays * 3 data points + 7 state vars = 34 inputs
         NeuralNetwork template = new NeuralNetwork(34);
         template.newLayer(28);
-        template.newLayer(2, ActivationFunction.sigmoid()); // Output: Horizontal, Jump
+        template.newLayer(2, ActivationFunction.sigmoid());
 
         // Initialize Generation
         generation = new Generation(template, 2000, 100, 0.15, 0.25);
 
         createLevels();
-
-        // Create Initial Players
         players = populatePlayers(generation);
-
-        // Reset for first level
         resetPlayers(levels.getFirst().getSpawnPos());
     }
 
     private @NotNull List<Player> populatePlayers(@NotNull Generation gen) {
         List<Player> newPlayers = new ArrayList<>();
-
         for (int i = 0; i < gen.getSize(); i++) {
             newPlayers.add(new Player(new Vector(0, 0), new Vector(10, 25), gen.getAgents()[i]));
         }
@@ -117,19 +134,19 @@ public class Main extends Application {
     private void updatePhysics() {
         Level currentLevel = levels.get(currentLevelIndex);
 
-        for (Player p : players) {
+        // Note: We iterate a local reference to avoid race conditions if players are reset
+        List<Player> currentPlayers = players;
+
+        for (Player p : currentPlayers) {
             double distToGoal = currentLevel.getGoal().subtract(p.getPos()).magnitude();
             if (p.isAlive() && distToGoal > 30) {
                 if (currentStep > 730) {
                     Rectangle2D kz = currentLevel.getKillZone();
-                    // Simple AABB check against KillZone
                     if (p.getPos().x() < kz.getMaxX() && p.right() > kz.getMinX() &&
                             p.getPos().y() < kz.getMaxY() && p.bottom() > kz.getMinY()) {
                         p.die();
                     }
                 }
-
-                // Update Physics
                 p.update(currentLevel.getPlatforms(), currentLevel.getGoal());
             }
         }
@@ -138,13 +155,13 @@ public class Main extends Application {
 
     private void finishLevel() {
         Level level = levels.get(currentLevelIndex);
+        List<Player> currentPlayers = players;
 
         // 1. Calculate Scores
-        for (Player p : players) {
+        for (Player p : currentPlayers) {
             double distToGoal = level.getGoal().subtract(p.getPos()).magnitude();
             double penalty = (distToGoal / 2.5) + p.getMinDistToGoal();
-
-             p.getBrain().changeScore(-penalty);
+            p.getBrain().changeScore(-penalty);
         }
 
         // 2. Advance Level
@@ -153,9 +170,8 @@ public class Main extends Application {
 
         // 3. Check if Generation Done
         if (currentLevelIndex >= levels.size()) {
-            // Evolve
             generation = generation.nextGeneration();
-            players = populatePlayers(generation);
+            players = populatePlayers(generation); // Replaces the list reference
             currentLevelIndex = 0;
             currentGenNum++;
             System.out.println("NEW GEN! " + currentGenNum + "/" + NUM_GENS);
@@ -167,11 +183,10 @@ public class Main extends Application {
 
     private void resetPlayers(Vector spawn) {
         Random rand = new Random();
-        for (Player p : players) {
-            // Random jitter on spawn
+        List<Player> currentPlayers = players;
+        for (Player p : currentPlayers) {
             double rx = spawn.x() + rand.nextDouble() * 2 - 1;
             double ry = spawn.y() + rand.nextDouble() * 2 - 1;
-
             p.setPos(new Vector(rx, ry));
             p.revive();
         }
@@ -182,11 +197,10 @@ public class Main extends Application {
         gc.setFill(Color.BLACK);
         gc.fillRect(0, 0, gameCanvas.getWidth(), gameCanvas.getHeight());
 
-        // Draw Level
         Level level = levels.get(currentLevelIndex);
+        Rectangle2D kz = level.getKillZone();
 
         // Draw Kill Zone
-        Rectangle2D kz = level.getKillZone();
         gc.setFill(Color.rgb(100, 100, 100, 0.4));
         gc.fillRect(kz.getMinX(), kz.getMinY(), kz.getWidth(), kz.getHeight());
 
@@ -195,13 +209,17 @@ public class Main extends Application {
         gc.fillOval(level.getGoal().x(), level.getGoal().y(), 10, 10);
 
         // Draw Platforms
-        for (Platform p : level.getPlatforms()) {
+        for (com.example.toml_final.Platform p : level.getPlatforms()) {
             p.draw(gc);
         }
 
         // Draw Players
-        for (Player p : players) {
-            p.draw(gc);
+        // Grab a local reference in case the background thread swaps the list
+        List<Player> playersToDraw = players;
+        if (playersToDraw != null) {
+            for (Player p : playersToDraw) {
+                p.draw(gc);
+            }
         }
 
         // Draw Info Text
@@ -209,35 +227,28 @@ public class Main extends Application {
         gc.setFont(new Font("Arial", INFO_PANE_HEIGHT));
         gc.fillText("Gen " + currentGenNum + ", Lvl " + (currentLevelIndex+1), 10, INFO_PANE_HEIGHT);
 
-
-        // Clear Network Canvas
-        netGc.setFill(Color.rgb(30, 30, 30)); // Dark Grey Background
+        // --- Draw Network ---
+        netGc.setFill(Color.rgb(30, 30, 30));
         netGc.fillRect(0, 0, networkCanvas.getWidth(), networkCanvas.getHeight());
 
-        // Find the player with the highest score
         Player bestPlayer = null;
         float maxScore = -Float.MAX_VALUE;
 
-        for (Player p : players) {
-            // Note: Since we penalize on death, "Alive" players will naturally
-            // have higher scores (0) than Dead players (-100).
-            float score = p.getBrain().getScore();
-            if (score > maxScore) {
-                maxScore = score;
-                bestPlayer = p;
+        if (playersToDraw != null) {
+            for (Player p : playersToDraw) {
+                float score = p.getBrain().getScore();
+                if (score > maxScore) {
+                    maxScore = score;
+                    bestPlayer = p;
+                }
             }
         }
 
-        // Draw the best player's brain
         if (bestPlayer != null) {
-            // Label the network
             netGc.setFill(Color.WHITE);
             netGc.fillText("Best Agent Score: " + String.format("%.2f", maxScore), 10, 15);
-
-            // Use the display method we added to NeuralNetwork
             bestPlayer.getBrain().getNetwork().display(netGc, networkCanvas.getWidth(), networkCanvas.getHeight());
 
-            // Optional: Highlight the best player in the game view so we know who we are looking at
             gc.setStroke(Color.CYAN);
             gc.setLineWidth(2);
             gc.strokeRect(bestPlayer.getPos().x() - 2, bestPlayer.getPos().y() - 2,
@@ -245,7 +256,6 @@ public class Main extends Application {
         }
     }
 
-    // --- Level Creation (Porting the Python Lists) ---
     private void createLevels() {
         levels = new ArrayList<>();
 
@@ -307,7 +317,6 @@ public class Main extends Application {
         };
         Level l4 = new Level(l4_obs, new Vector(280, 170), new Vector(10, 325), new Vector(520, 225), new Rectangle2D(0, 0, 100, 400));
 
-        // Add to list including variations
         levels.add(l4);
         levels.add(l4.getAlt());
         levels.add(l1);
