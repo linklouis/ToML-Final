@@ -25,8 +25,8 @@ public class Main extends Application {
     private static final int INFO_PANE_HEIGHT = 15;
 
     // Physics Constants
-    private static final int MAX_STEPS_PER_LEVEL = 1000;
-    private static final int TIME_BEFORE_KILL_ZONE = 500;   // When Player.FPS was 60: 1000
+    private static final int MAX_STEPS_PER_LEVEL = 700;
+    private static final int TIME_BEFORE_KILL_ZONE = 200;   // When Player.FPS was 60: 1000
     private static final int NUM_GENS = 1000;
     private static final int NUM_AGENTS = 1000;
     private static final double KEEP_RATE = 0.2;

@@ -9,14 +9,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Player extends GameObj{
-    private static final double PIXELS_PER_METER = 25;
+    private static final double PIXELS_PER_METER = 25/0.5;
     private static final double MOVEMENT_THRESHOLD = 0.2;
-    private static final double G = 9.8 * PIXELS_PER_METER;
+    private static final double G = 9.8;
     private static final double JUMP_THRESHOLD = 0.3;
     private static final double FPS = 60;
     private static final double MAX_RAY_DISTANCE = 500.0;
-    private static final double JUMP_STRENGTH = 210;
-    private static final double MAX_MOVE_SPEED = 8.8 * PIXELS_PER_METER;
+    private static final double JUMP_STRENGTH = 6;
+    private static final double MAX_MOVE_SPEED = 9.2/PIXELS_PER_METER*25/1.8;   // Human av is 8.8
     private static final Color ALIVE_COLOR = new Color(50/255.0, 200/255.0, 100/255.0, 1);
     private static final Color DEAD_COLOR = new Color(20/255.0, 100/255.0, 60/255.0, 1);
 
@@ -148,7 +148,7 @@ public class Player extends GameObj{
         // TODO: I don't think the jump strength should be affected by the FPS? Maybe?
         vel = new Vector(vel.x(), -JUMP_STRENGTH * jumpStrength);
         isOnGround = false;
-        changeLevelScore(-2 * jumpStrength);
+//        changeLevelScore(-1.5 * jumpStrength);
     }
 
     public void update(Platform[] obstacles, Vector goalPos) {
@@ -186,7 +186,7 @@ public class Player extends GameObj{
         vel = new Vector(newVelX, vel.y());
 
         // Move X
-        this.pos = new Vector(pos.x() + vel.x() / FPS, pos.y());
+        this.pos = new Vector(pos.x() + vel.x() * PIXELS_PER_METER / FPS, pos.y());
 
         // --- X AXIS COLLISIONS ---
         for (Platform obs : obstacles) {
@@ -224,7 +224,7 @@ public class Player extends GameObj{
             jump((jump - JUMP_THRESHOLD) / (1 - JUMP_THRESHOLD));
         }
 
-        this.pos = new Vector(pos.x(), pos.y() + vel.y() / FPS);
+        this.pos = new Vector(pos.x(), pos.y() + vel.y() * PIXELS_PER_METER / FPS);
 
         // --- Y AXIS COLLISIONS ---
         isOnGround = false;
