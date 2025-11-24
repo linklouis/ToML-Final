@@ -16,7 +16,7 @@ public class Player extends GameObj{
     private static final double FPS = 60;
     private static final double MAX_RAY_DISTANCE = 500.0;
     private static final double JUMP_STRENGTH = 210;
-    private static final double MAX_MOVE_SPEED = 5 * PIXELS_PER_METER;
+    private static final double MAX_MOVE_SPEED = 8.8 * PIXELS_PER_METER;
     private static final Color ALIVE_COLOR = new Color(50/255.0, 200/255.0, 100/255.0, 1);
     private static final Color DEAD_COLOR = new Color(20/255.0, 100/255.0, 60/255.0, 1);
 
@@ -148,7 +148,7 @@ public class Player extends GameObj{
         // TODO: I don't think the jump strength should be affected by the FPS? Maybe?
         vel = new Vector(vel.x(), -JUMP_STRENGTH * jumpStrength);
         isOnGround = false;
-        changeLevelScore(-2.5 * jumpStrength);
+        changeLevelScore(-2 * jumpStrength);
     }
 
     public void update(Platform[] obstacles, Vector goalPos) {
@@ -167,18 +167,18 @@ public class Player extends GameObj{
 
         if (isOnGround) {
             if (Math.abs(horizontal) > MOVEMENT_THRESHOLD) {
-                newVelX += horizontal * MAX_MOVE_SPEED * 10 / FPS;
+                newVelX = horizontal * MAX_MOVE_SPEED;
             } else {
                 newVelX -= (newVelX - newVelX*0.1)/FPS; // TODO: Trying to make drag scaled by the FPS. Normally looks like newVelX *= 0.1;
 
             }
         } else {
             if (Math.abs(horizontal) > MOVEMENT_THRESHOLD) {
-                newVelX += horizontal / 7 / FPS;
+                newVelX += horizontal * MAX_MOVE_SPEED / 7 / FPS;
 //                newVelX *= 0.9999;
             } else {
 //            if (Math.abs(horizontal) < MOVEMENT_THRESHOLD) {
-//                newVelX = (newVelX - newVelX*0.98)/FPS;    // TODO: Trying to make drag scaled by the FPS. Normally looks like newVelX *= 0.98;
+                newVelX -= (newVelX - newVelX*0.98)/FPS;    // TODO: Trying to make drag scaled by the FPS. Normally looks like newVelX *= 0.98;
             }
         }
 

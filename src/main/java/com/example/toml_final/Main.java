@@ -80,20 +80,20 @@ public class Main extends Application {
         initSimulation();
 
         // 3. Start Physics Thread
-//        Thread physicsThread = new Thread(this::physicsLoop);
-//        physicsThread.setDaemon(true);
-//        physicsThread.setPriority(Thread.MAX_PRIORITY);
-//        physicsThread.start();
+        Thread physicsThread = new Thread(this::physicsLoop);
+        physicsThread.setDaemon(true);
+        physicsThread.setPriority(Thread.MAX_PRIORITY);
+        physicsThread.start();
 
         // 4. Start Render Thread
         AnimationTimer renderLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
-                updatePhysics();
-
-                if (currentStep >= MAX_STEPS_PER_LEVEL) {
-                    finishLevel();
-                }
+//                updatePhysics();
+//
+//                if (currentStep >= MAX_STEPS_PER_LEVEL) {
+//                    finishLevel();
+//                }
                 render();
             }
         };
