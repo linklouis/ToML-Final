@@ -10,7 +10,7 @@ import java.util.List;
 
 public class Player extends GameObj{
     private static final double MOVEMENT_THRESHOLD = 0.2;
-    private static final double JUMP_THRESHOLD = 0.2;
+    private static final double JUMP_THRESHOLD = 0.3;
     private static final double G = 9.8;
     private static final double FPS = 60;
     private static final double MAX_RAY_DISTANCE = 500.0;
@@ -21,14 +21,17 @@ public class Player extends GameObj{
     private static final Color DEAD_COLOR = new Color(20/255.0, 100/255.0, 60/255.0, 1);
 
     private Vector vel = new Vector(0, 0);
-    private Agent brain;
+    private final Agent brain;
     private boolean isOnGround = false;
     private double minDistToGoal = Double.MAX_VALUE;
     private boolean isAlive = true;
 
-    private List<Platform> touched_platforms = new ArrayList<>();
+    private double levelScore = 0;
 
-    private record RayHit(double distance, Platform object) {}
+    private final List<Platform> touched_platforms = new ArrayList<>();
+
+    private record RayHit(double distance, Platform object, boolean isVertical) {}
+    private record Intersection(double distance, boolean isVertical) {}
 
     public Player(Vector pos, Vector dim, Agent brain) {
         super(pos, dim, ALIVE_COLOR);
@@ -39,26 +42,26 @@ public class Player extends GameObj{
     private @NotNull RayHit castRay(Vector origin, Vector direction, Platform @NotNull [] obstacles) {
         double closestDist = MAX_RAY_DISTANCE;
         Platform closestObj = null;
+        boolean closestIsVertical = false; // Default to horizontal
 
         for (Platform obs : obstacles) {
-            // Calculate intersection distance between Ray and Obstacle Rectangle
-            // (Assuming GameObj has pos (x,y) and dim (width,height))
-            Double hitDist = getRayIntersection(origin, direction, obs);
+            Intersection hit = getRayIntersection(origin, direction, obs);
 
-            if (hitDist != null) {
-                if (hitDist < closestDist) {
-                    closestDist = hitDist;
+            if (hit != null) {
+                if (hit.distance < closestDist) {
+                    closestDist = hit.distance;
                     closestObj = obs;
+                    closestIsVertical = hit.isVertical;
                 }
             }
         }
-        return new RayHit(closestDist, closestObj);
+        return new RayHit(closestDist, closestObj, closestIsVertical);
     }
 
     public float[] getInputs(Platform[] obstacles, Vector goalPos) {
         Vector origin = this.center();
 
-        int numRays = 16;
+        int numRays = 20;
         float[] inputs = new float[(numRays * 3) + 7]; // 3 inputs per ray + 7 state inputs
         int index = 0;
 
@@ -72,15 +75,17 @@ public class Player extends GameObj{
             // Input A: Normalized Distance
             inputs[index++] = (float) (hit.distance / MAX_RAY_DISTANCE);
 
-            // Input B & C: Type Inputs (One-Hot encoding style)
+            // Input B: Orientation (Replaces "Is Solid")
             if (hit.object != null) {
-                boolean isDangerous = hit.object.getType() == Platform.Type.KILL;
+                // 1.0 for Wall, 0.5 for Floor/Ceiling
+                inputs[index++] = hit.isVertical ? 1.0f : 0.5f;
 
-                inputs[index++] = 1.0f; // It is solid
-                inputs[index++] = isDangerous ? 1.0f : 0.0f; // Is it dangerous?
+                // Input C: Danger
+                boolean isDangerous = hit.object.getType() == Platform.Type.KILL;
+                inputs[index++] = isDangerous ? 1.0f : 0.0f;
             } else {
-                inputs[index++] = 0.0f; // Not solid
-                inputs[index++] = 0.0f; // Not dangerous
+                inputs[index++] = 0.0f; // Empty
+                inputs[index++] = 0.0f; // Safe
             }
         }
 
@@ -122,7 +127,7 @@ public class Player extends GameObj{
      */
     public void die() {
         isAlive = false;
-        brain.changeScore(-100);
+        changeLevelScore(-100);
         this.setColor(DEAD_COLOR);
     }
 
@@ -130,17 +135,30 @@ public class Player extends GameObj{
      * Set alive flag to true, change the color, reset the distance to goal counter,
      * and set velocity to 9.8 down(to hopefully prevent issues with teleporting when spawning inside platforms).
      */
-    public void revive() {
+    public void reset() {
         isAlive = true;
         this.setColor(ALIVE_COLOR);
         vel = new Vector(0, 9.8);
         minDistToGoal = Double.MAX_VALUE;
+        touched_platforms.clear();
+    }
+
+    public void jump(double jumpStrength) {
+        vel = new Vector(vel.x(), -JUMP_STRENGTH * jumpStrength);
+        isOnGround = false;
+        changeLevelScore(-4 * jumpStrength);
     }
 
     public void update(Platform[] obstacles, Vector goalPos) {
         float[] output = brain.predict(getInputs(obstacles, goalPos));
         float horizontal = output[0];
         float jump = output[1];
+
+        for (Platform obs : obstacles) {
+            if (checkCollision(this, obs)) {
+                System.out.println("HELP");
+            }
+        }
 
         // --- X AXIS PHYSICS ---
         double newVelX = vel.x();
@@ -154,9 +172,12 @@ public class Player extends GameObj{
             }
         } else {
             if (Math.abs(horizontal) > MOVEMENT_THRESHOLD) {
-                newVelX += horizontal / 4;
+                newVelX += horizontal / 10;
+//                newVelX *= 0.9999;
+            } else {
+//            if (Math.abs(horizontal) < MOVEMENT_THRESHOLD) {
+                newVelX *= 0.95;
             }
-            newVelX *= 0.98;
         }
 
         newVelX = Math.clamp(newVelX, -MAX_MOVE_SPEED, MAX_MOVE_SPEED);
@@ -174,15 +195,15 @@ public class Player extends GameObj{
                 }
 
                 // Calculate overlap on both axes
-                double overlapX = Math.min(this.right(), obs.right()) - Math.max(this.left(), obs.left());
-                double overlapY = Math.min(this.bottom(), obs.bottom()) - Math.max(this.top(), obs.top());
-
-                // If the Y overlap is significantly smaller than X overlap,
-                // we are just skimming the surface (floor/ceiling).
-                // Ignore this collision in the X-loop; let the Y-loop handle it.
-                if (overlapY < overlapX) {
-                    continue;
-                }
+//                double overlapX = Math.min(this.right(), obs.right()) - Math.max(this.left(), obs.left());
+//                double overlapY = Math.min(this.bottom(), obs.bottom()) - Math.max(this.top(), obs.top());
+//
+//                // If the Y overlap is significantly smaller than X overlap,
+//                // we are just skimming the surface (floor/ceiling).
+//                // Ignore this collision in the X-loop; let the Y-loop handle it.
+//                if (overlapY < overlapX) {
+//                    continue;
+//                }
 
                 if (vel.x() > 0) {
                     this.pos = new Vector(obs.getPos().x() - this.getDim().x(), pos.y());
@@ -198,8 +219,7 @@ public class Player extends GameObj{
         vel = new Vector(vel.x(), vel.y() + G / FPS);
 
         if (isOnGround && jump > JUMP_THRESHOLD) {
-            vel = new Vector(vel.x(), -JUMP_STRENGTH * jump);
-            isOnGround = false;
+            jump((jump - JUMP_THRESHOLD) / (1 - JUMP_THRESHOLD));
         }
 
         this.pos = new Vector(pos.x(), pos.y() + vel.y() / FPS);
@@ -216,21 +236,21 @@ public class Player extends GameObj{
                 // We need the same overlap logic here that we used in the X loop,
                 // but inverted. We want to ignore "Walls" while calculating "Floors/Ceilings".
 
-                double overlapX = Math.min(this.right(), obs.right()) - Math.max(this.left(), obs.left());
-                double overlapY = Math.min(this.bottom(), obs.bottom()) - Math.max(this.top(), obs.top());
-
-                // If the X overlap is smaller than the Y overlap, it's a Wall hit.
-                // Ignore it in this Y-loop (the X-loop handled it already).
-                if (overlapX < overlapY) {
-                    continue;
-                }
+//                double overlapX = Math.min(this.right(), obs.right()) - Math.max(this.left(), obs.left());
+//                double overlapY = Math.min(this.bottom(), obs.bottom()) - Math.max(this.top(), obs.top());
+//
+//                // If the X overlap is smaller than the Y overlap, it's a Wall hit.
+//                // Ignore it in this Y-loop (the X-loop handled it already).
+//                if (overlapX < overlapY) {
+//                    continue;
+//                }
 
                 if (vel.y() >= 0) {
                     this.pos = new Vector(pos.x(), obs.getPos().y() - this.getDim().y());
                     isOnGround = true;
                     if (!touched_platforms.contains(obs)) {
                         touched_platforms.add(obs);
-                        brain.changeScore(50);
+                        changeLevelScore(70);
                     }
                 } else {
                     this.pos = new Vector(pos.x(), obs.getPos().y() + obs.getDim().y());
@@ -241,9 +261,11 @@ public class Player extends GameObj{
         }
 
         // --- GOAL TRACKING ---
-        double distToGoal = goalPos.subtract(this.pos).magnitude();
-        if (distToGoal < minDistToGoal) {
-            minDistToGoal = distToGoal;
+        if (isOnGround) {
+            double distToGoal = goalPos.subtract(this.center()).magnitude();
+            if (distToGoal < minDistToGoal) {
+                minDistToGoal = distToGoal;
+            }
         }
     }
 
@@ -280,34 +302,50 @@ public class Player extends GameObj{
      * Helper: Standard Ray vs AABB (Axis Aligned Bounding Box) intersection.
      * Returns distance to impact, or null if no intersection.
      */
-    private @Nullable Double getRayIntersection(Vector origin, @NotNull Vector dir, GameObj obj) {
-        double tMin = 0.0;
-        double tMax = MAX_RAY_DISTANCE;
+    private @Nullable Intersection getRayIntersection(Vector origin, @NotNull Vector dir, GameObj obj) {
+        double tMinX = Double.NEGATIVE_INFINITY;
+        double tMaxX = Double.POSITIVE_INFINITY;
+
+        double tMinY = Double.NEGATIVE_INFINITY;
+        double tMaxY = Double.POSITIVE_INFINITY;
 
         // Check X slab
-        if (Math.abs(dir.x()) < 1e-9) { // Ray is parallel to Y axis
+        if (Math.abs(dir.x()) < 1e-9) {
             if (origin.x() < obj.getPos().x() || origin.x() > obj.getPos().x() + obj.getDim().x())
                 return null;
         } else {
             double t1 = (obj.getPos().x() - origin.x()) / dir.x();
             double t2 = ((obj.getPos().x() + obj.getDim().x()) - origin.x()) / dir.x();
-            tMin = Math.max(tMin, Math.min(t1, t2));
-            tMax = Math.min(tMax, Math.max(t1, t2));
+            tMinX = Math.min(t1, t2);
+            tMaxX = Math.max(t1, t2);
         }
 
         // Check Y slab
-        if (Math.abs(dir.y()) < 1e-9) { // Ray is parallel to X axis
+        if (Math.abs(dir.y()) < 1e-9) {
             if (origin.y() < obj.getPos().y() || origin.y() > obj.getPos().y() + obj.getDim().y())
                 return null;
         } else {
             double t1 = (obj.getPos().y() - origin.y()) / dir.y();
             double t2 = ((obj.getPos().y() + obj.getDim().y()) - origin.y()) / dir.y();
-            tMin = Math.max(tMin, Math.min(t1, t2));
-            tMax = Math.min(tMax, Math.max(t1, t2));
+            tMinY = Math.min(t1, t2);
+            tMaxY = Math.max(t1, t2);
         }
 
-        if (tMin > tMax) return null; // No intersection
-        return tMin;
+        // Final intersection logic
+        double tMin = Math.max(tMinX, tMinY);
+        double tMax = Math.min(tMaxX, tMaxY);
+
+        // If tMin > tMax, the ray missed the box entirely
+        if (tMin > tMax || tMax < 0) return null;
+
+        // Determine Normal: If tMin came from the X calculation, we hit a vertical wall.
+        boolean isVertical = (tMinX > tMinY);
+
+        // Ensure we return the entry point (tMin), but handle starting inside the box (tMin < 0)
+        double dist = (tMin < 0) ? tMax : tMin;
+        if (dist > MAX_RAY_DISTANCE) return null;
+
+        return new Intersection(dist, isVertical);
     }
 
     // Helper: Basic AABB Collision check
@@ -332,5 +370,16 @@ public class Player extends GameObj{
 
     public boolean isAlive() {
         return isAlive;
+    }
+
+    public void changeLevelScore(double change) {
+        levelScore += change;
+    }
+
+    /**
+     * Updates the cumulative score based on the calculated level score
+     */
+    public void updateScore(double levelWeight) {
+        brain.changeScore(levelScore * levelWeight);
     }
 }

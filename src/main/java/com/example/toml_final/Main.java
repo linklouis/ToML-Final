@@ -29,9 +29,9 @@ public class Main extends Application {
     private static final int NUM_GENS = 1000;
     private static final int NUM_AGENTS = 1000;
     private static final double KEEP_RATE = 0.2;
-    private static final double MUTATION_CHANCE = 0.3;
-    private static final double MUTATION_SIZE = 0.4;
-    private static final int NUM_INPUTS = 55;
+    private static final double MUTATION_CHANCE = 0.15;
+    private static final double MUTATION_SIZE = 0.2;
+    private static final int NUM_INPUTS = 20*3 + 7;//55;
 
     // Game State (Volatile is crucial here for thread visibility)
     private Generation generation;
@@ -131,7 +131,6 @@ public class Main extends Application {
             p.draw(gc);
         }
 
-        // --- NEW RENDERING LOGIC ---
         if (allPlayers != null) {
 
             // 1. Separate Alive vs Dead to handle Z-Indexing and Coloring
@@ -207,8 +206,8 @@ public class Main extends Application {
 
     private void initSimulation() {
         NeuralNetwork template = new NeuralNetwork(NUM_INPUTS);
-        template.newLayer(40);
-        template.newLayer(25);
+        template.newLayer(NUM_INPUTS * 2 / 3);
+//        template.newLayer(30);
         template.newLayer(2, ActivationFunction.sigmoid());
 
         generation = new Generation(template, NUM_AGENTS, (int) (NUM_AGENTS*KEEP_RATE), MUTATION_CHANCE, MUTATION_SIZE);
@@ -235,19 +234,19 @@ public class Main extends Application {
         // Parallel Stream for maximum physics throughput
         currentPlayers.parallelStream().forEach(p -> {
             if (p.isAlive()) {
-                if (stepSnapshot > 800) {
+                if (stepSnapshot > 1000) {
                     Rectangle2D kz = currentLevel.getKillZone();
                     if (p.getPos().x() < kz.getMaxX() && p.right() > kz.getMinX() &&
                             p.getPos().y() < kz.getMaxY() && p.bottom() > kz.getMinY()) {
                         p.die();
-                        p.getBrain().changeScore(70); // Only want them to lose ~30 points for not making it out of the starting area
+//                        p.getBrain().changeScore(80); // Only want them to lose ~20 points for not making it out of the starting area
                     }
                 }
                 p.update(currentLevel.getPlatforms(), currentLevel.getGoal());
                 double distToGoal = currentLevel.getGoal().subtract(p.center()).magnitude();
                 if (distToGoal <= 10) {
                     p.die();
-                    p.getBrain().changeScore(300);  // Adds 200 since dying removes 100
+                    p.changeLevelScore(300);  // Adds 200 since dying removes 100
                 }
             }
         });
@@ -261,9 +260,8 @@ public class Main extends Application {
 
         // 1. Calculate Scores
         currentPlayers.parallelStream().forEach(p -> {
-            double distToGoal = level.getGoal().subtract(p.getPos()).magnitude();
-            double penalty = ((distToGoal / 2.5) + p.getMinDistToGoal())/3;
-            p.getBrain().changeScore(-penalty);
+            p.changeLevelScore(scorePlayer(level, p));
+            p.updateScore(level.getWeight());
         });
 
         // 2. Advance Level
@@ -285,6 +283,11 @@ public class Main extends Application {
         resetPlayers(levels.get(currentLevelIndex).getSpawnPos());
     }
 
+    private double scorePlayer(@NotNull Level level, @NotNull Player player) {
+//        double distToGoal = level.getGoal().subtract(player.getPos()).magnitude();
+        return - (/*(distToGoal / 2.5) +*/ player.getMinDistToGoal())/5;
+    }
+
     private void resetPlayers(Vector spawn) {
         Random rand = new Random();
         List<Player> currentPlayers = players;
@@ -295,7 +298,7 @@ public class Main extends Application {
             double rx = spawn.x() + localRand.nextDouble() * 2 - 1;
             double ry = spawn.y() + localRand.nextDouble() * 2 - 1;
             p.setPos(new Vector(rx, ry));
-            p.revive();
+            p.reset();
         });
     }
 
@@ -314,52 +317,77 @@ public class Main extends Application {
                 new Platform(new Vector(140, HEIGHT - 51), new Vector(50, 10), Platform.Type.KILL),
                 new Platform(new Vector(290, HEIGHT - 51), new Vector(320-290, 10), Platform.Type.KILL)
         };
-        Level l1 = new Level(l1_obs, new Vector(500, 300), new Vector(4, 325), null, new Rectangle2D(0, 0, 100, 400));
+        Level l1 = new Level(2, l1_obs, new Vector(500, 300), new Vector(5, 322), null, new Rectangle2D(0, 0, 100, 400));
 
-        // Level 2
+        // Level 2: Evan
         Platform[] l2_obs = {
                 new Platform(new Vector(0, HEIGHT - 50), new Vector(WIDTH, 50), Platform.Type.STANDARD),
                 new Platform(new Vector(-10, 0), new Vector(11, HEIGHT), Platform.Type.STANDARD),
                 new Platform(new Vector(WIDTH - 1, 0), new Vector(11, HEIGHT), Platform.Type.STANDARD),
+
                 new Platform(new Vector(0, 260), new Vector(100, 10), Platform.Type.KILL),
                 new Platform(new Vector(100, 260), new Vector(40, 10), Platform.Type.STANDARD),
                 new Platform(new Vector(90, 325), new Vector(10, 25), Platform.Type.KILL),
                 new Platform(new Vector(200, 290), new Vector(150, 10), Platform.Type.STANDARD),
-                new Platform(new Vector(220, 200), new Vector(100, 10), Platform.Type.STANDARD),
-                new Platform(new Vector(250, 265), new Vector(10, 25), Platform.Type.KILL),
+                new Platform(new Vector(210, 200), new Vector(110, 10), Platform.Type.STANDARD),
+//                new Platform(new Vector(250, 265), new Vector(10, 25), Platform.Type.KILL),
                 new Platform(new Vector(350, 290), new Vector(50, 10), Platform.Type.KILL),
-                new Platform(new Vector(240, 200), new Vector(10, 200), Platform.Type.KILL)
+                new Platform(new Vector(249, 210), new Vector(10, 200), Platform.Type.STANDARD)
         };
-        Level l2 = new Level(l2_obs, new Vector(230, 190), new Vector(4, 325), new Vector(500, 325), new Rectangle2D(0, 0, 80, 400));
+        Level l2 = new Level(3, l2_obs, new Vector(230, 190), new Vector(5, 322), new Vector(500, 322), new Rectangle2D(0, 0, 80, 400));
 
-        // Level 3
+        // Level 3: Vertical
         Platform[] l3_obs = {
                 new Platform(new Vector(0, HEIGHT - 50), new Vector(WIDTH, 50), Platform.Type.STANDARD),
-                new Platform(new Vector(-10, 0), new Vector(11, HEIGHT), Platform.Type.STANDARD),
-                new Platform(new Vector(170, 0), new Vector(11, HEIGHT), Platform.Type.STANDARD),
-                new Platform(new Vector(0, 270), new Vector(50, 10), Platform.Type.STANDARD),
-                new Platform(new Vector(120, 210), new Vector(50, 10), Platform.Type.STANDARD),
-                new Platform(new Vector(0, 160), new Vector(50, 10), Platform.Type.STANDARD),
-                new Platform(new Vector(120, 110), new Vector(50, 10), Platform.Type.STANDARD),
-                new Platform(new Vector(0, 50), new Vector(90, 10), Platform.Type.STANDARD)
-        };
-        Level l3 = new Level(l3_obs, new Vector(80, 10), new Vector(80, 325), null, new Rectangle2D(0, 300, 170, 50));
+                new Platform(new Vector(-10, 0), new Vector(10, HEIGHT), Platform.Type.STANDARD),
+                new Platform(new Vector(WIDTH, 0), new Vector(10, HEIGHT), Platform.Type.STANDARD),
+//                new Platform(new Vector(0, -10), new Vector(170, 11), Platform.Type.STANDARD),
 
-        // Level 4
+                new Platform(new Vector(250, 270), new Vector(50, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(370, 210), new Vector(50, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(250, 160), new Vector(50, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(370, 110), new Vector(50, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(250, 50), new Vector(90, 15), Platform.Type.STANDARD),
+
+                new Platform(new Vector(0, HEIGHT - 51), new Vector(100, 10), Platform.Type.KILL),
+                new Platform(new Vector(WIDTH - 100, HEIGHT - 51), new Vector(100, 10), Platform.Type.KILL)
+        };
+        Level l3 = new Level(1.2, l3_obs, new Vector(85+250, 10), new Vector(80+250, 323), new Vector(20+250, 180),null);// new Rectangle2D(0, 300, 170, 50));
+
+        // Level 4: Hannah
         Platform[] l4_obs = {
                 new Platform(new Vector(0, HEIGHT - 50), new Vector(WIDTH, 50), Platform.Type.STANDARD),
                 new Platform(new Vector(-10, 0), new Vector(11, HEIGHT), Platform.Type.STANDARD),
                 new Platform(new Vector(WIDTH - 1, 0), new Vector(11, HEIGHT), Platform.Type.STANDARD),
+
                 new Platform(new Vector(100, 300), new Vector(50, 50), Platform.Type.STANDARD),
                 new Platform(new Vector(220, 300), new Vector(50, 50), Platform.Type.STANDARD),
                 new Platform(new Vector(150, 349), new Vector(70, 10), Platform.Type.KILL),
                 new Platform(new Vector(270, 190), new Vector(50, 50), Platform.Type.STANDARD),
                 new Platform(new Vector(400, 300), new Vector(50, 50), Platform.Type.STANDARD),
                 new Platform(new Vector(390, 190), new Vector(50, 50), Platform.Type.STANDARD),
-                new Platform(new Vector(500, 250), new Vector(50, 100), Platform.Type.STANDARD)
+                new Platform(new Vector(500, 250), new Vector(50, 100), Platform.Type.STANDARD),
+                new Platform(new Vector(550, 349), new Vector(50, 10), Platform.Type.KILL)
         };
-        Level l4 = new Level(l4_obs, new Vector(280, 170), new Vector(10, 325), new Vector(520, 220), new Rectangle2D(0, 0, 100, 400));
-        Level l4a = new Level(l4_obs, new Vector(280, 170), new Vector(230, 273), new Vector(410, 273), new Rectangle2D(0, 0, 100, 400));
+        Level l4 = new Level(1, l4_obs, new Vector(310, 170), new Vector(10, 323), new Vector(520, 220), new Rectangle2D(0, 0, 100, 400));
+        Level l4a = new Level(1, l4_obs, new Vector(310, 170), new Vector(230, 273), new Vector(410, 273), new Rectangle2D(0, 0, 100, 400));
+
+        // Level 5: Right Jumps
+        Platform[] l5_obs = {
+                new Platform(new Vector(0, HEIGHT - 50), new Vector(WIDTH, 50), Platform.Type.STANDARD),
+                new Platform(new Vector(-10, 0), new Vector(11, HEIGHT), Platform.Type.STANDARD),
+                new Platform(new Vector(WIDTH - 1, 0), new Vector(11, HEIGHT), Platform.Type.STANDARD),
+
+                new Platform(new Vector(100, 300), new Vector(50, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(200, 250), new Vector(50, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(300, 200), new Vector(50, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(400, 150), new Vector(50, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(500, 100), new Vector(100, 15), Platform.Type.STANDARD),
+
+
+                new Platform(new Vector(550, 349), new Vector(50, 10), Platform.Type.KILL)
+        };
+        Level l5 = new Level(0.3, l5_obs, new Vector(520, 70), new Vector(10, 323) , null, new Rectangle2D(0, 0, 100, 400));
 
 
         for (int i = 0; i < 2; i++) {
@@ -370,6 +398,8 @@ public class Main extends Application {
             levels.add(l1);
             levels.add(l2);
             levels.add(l3);
+            levels.add(l3.getAlt());
+            levels.add(l5);
             levels.add(l4.getReversed(WIDTH));
             levels.add(l4.getReversed(WIDTH).getAlt());
             levels.add(l4a.getReversed(WIDTH));
@@ -377,6 +407,8 @@ public class Main extends Application {
             levels.add(l1.getReversed(WIDTH));
             levels.add(l2.getReversed(WIDTH));
             levels.add(l3.getReversed(WIDTH));
+            levels.add(l3.getReversed(WIDTH).getAlt());
+            levels.add(l5.getReversed(WIDTH));
         }
     }
 

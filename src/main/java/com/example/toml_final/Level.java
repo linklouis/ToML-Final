@@ -9,17 +9,19 @@ public class Level {
     private final Vector spawnPos;
     private final Vector alternateSpawn;
     private final Rectangle2D killZone;
+    private double weight;
 
     /**
      * @param alternateSpawn If null, defaults to spawnPos (same as Python implementation)
      * @param killZone If null, defaults to empty Rect(0,0,0,0)
      */
-    public Level(Platform[] platforms, Vector goal, Vector spawnPos, @Nullable Vector alternateSpawn, @Nullable Rectangle2D killZone) {
+    public Level(double weight, Platform[] platforms, Vector goal, Vector spawnPos, @Nullable Vector alternateSpawn, @Nullable Rectangle2D killZone) {
         this.platforms = platforms;
         this.goal = goal;
         this.spawnPos = spawnPos;
         this.alternateSpawn = (alternateSpawn != null) ? alternateSpawn : spawnPos;
         this.killZone = (killZone != null) ? killZone : new Rectangle2D(0, 0, 0, 0);
+        this.weight = weight;
     }
 
     public Level getReversed(double screenWidth) {
@@ -58,13 +60,13 @@ public class Level {
         double kzNewX = screenWidth - killZone.getMaxX();
         Rectangle2D reversedKillZone = new Rectangle2D(kzNewX, killZone.getMinY(), killZone.getWidth(), killZone.getHeight());
 
-        return new Level(reversedPlatforms, reversedGoal, reversedSpawn, reversedAltSpawn, reversedKillZone);
+        return new Level(weight, reversedPlatforms, reversedGoal, reversedSpawn, reversedAltSpawn, reversedKillZone);
     }
 
     public Level getAlt() {
         // Creates a level using the alternate spawn as the main spawn
         // Passing 'null' for alternateSpawn makes the constructor set it to the new main spawn
-        return new Level(platforms, goal, alternateSpawn, null, killZone);
+        return new Level(weight, platforms, goal, alternateSpawn, null, killZone);
     }
 
     // --- Getters ---
@@ -73,4 +75,8 @@ public class Level {
     public Vector getSpawnPos() { return spawnPos; }
     public Vector getAlternateSpawn() { return alternateSpawn; }
     public Rectangle2D getKillZone() { return killZone; }
+
+    public double getWeight() {
+        return weight;
+    }
 }
