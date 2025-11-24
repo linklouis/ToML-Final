@@ -25,7 +25,8 @@ public class Main extends Application {
     private static final int INFO_PANE_HEIGHT = 15;
 
     // Physics Constants
-    private static final int MAX_STEPS_PER_LEVEL = 4000;
+    private static final int MAX_STEPS_PER_LEVEL = 1000;
+    private static final int TIME_BEFORE_KILL_ZONE = 500;   // When Player.FPS was 60: 1000
     private static final int NUM_GENS = 1000;
     private static final int NUM_AGENTS = 1000;
     private static final double KEEP_RATE = 0.2;
@@ -79,15 +80,20 @@ public class Main extends Application {
         initSimulation();
 
         // 3. Start Physics Thread
-        Thread physicsThread = new Thread(this::physicsLoop);
-        physicsThread.setDaemon(true);
-        physicsThread.setPriority(Thread.MAX_PRIORITY);
-        physicsThread.start();
+//        Thread physicsThread = new Thread(this::physicsLoop);
+//        physicsThread.setDaemon(true);
+//        physicsThread.setPriority(Thread.MAX_PRIORITY);
+//        physicsThread.start();
 
         // 4. Start Render Thread
         AnimationTimer renderLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
+                updatePhysics();
+
+                if (currentStep >= MAX_STEPS_PER_LEVEL) {
+                    finishLevel();
+                }
                 render();
             }
         };
@@ -234,7 +240,7 @@ public class Main extends Application {
         // Parallel Stream for maximum physics throughput
         currentPlayers.parallelStream().forEach(p -> {
             if (p.isAlive()) {
-                if (stepSnapshot > 1000) {
+                if (stepSnapshot > TIME_BEFORE_KILL_ZONE) {
                     Rectangle2D kz = currentLevel.getKillZone();
                     if (p.getPos().x() < kz.getMaxX() && p.right() > kz.getMinX() &&
                             p.getPos().y() < kz.getMaxY() && p.bottom() > kz.getMinY()) {
@@ -391,23 +397,23 @@ public class Main extends Application {
 
 
         for (int i = 0; i < 2; i++) {
-            levels.add(l4);
-            levels.add(l4.getAlt());
-            levels.add(l4a);
-            levels.add(l4a.getAlt());
             levels.add(l1);
             levels.add(l2);
             levels.add(l3);
             levels.add(l3.getAlt());
+            levels.add(l4);
+            levels.add(l4.getAlt());
+            levels.add(l4a);
+            levels.add(l4a.getAlt());
             levels.add(l5);
-            levels.add(l4.getReversed(WIDTH));
-            levels.add(l4.getReversed(WIDTH).getAlt());
-            levels.add(l4a.getReversed(WIDTH));
-            levels.add(l4a.getReversed(WIDTH).getAlt());
             levels.add(l1.getReversed(WIDTH));
             levels.add(l2.getReversed(WIDTH));
             levels.add(l3.getReversed(WIDTH));
             levels.add(l3.getReversed(WIDTH).getAlt());
+            levels.add(l4.getReversed(WIDTH));
+            levels.add(l4.getReversed(WIDTH).getAlt());
+            levels.add(l4a.getReversed(WIDTH));
+            levels.add(l4a.getReversed(WIDTH).getAlt());
             levels.add(l5.getReversed(WIDTH));
         }
     }

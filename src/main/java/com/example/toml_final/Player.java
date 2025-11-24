@@ -9,16 +9,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Player extends GameObj{
+    private static final double PIXELS_PER_METER = 25;
     private static final double MOVEMENT_THRESHOLD = 0.2;
+    private static final double G = 9.8 * PIXELS_PER_METER;
     private static final double JUMP_THRESHOLD = 0.3;
-    private static final double G = 9.8;
     private static final double FPS = 60;
     private static final double MAX_RAY_DISTANCE = 500.0;
-    private static final double MAX_JUMP = 40;
-    private static final double JUMP_STRENGTH = 40;
-    private static final double MAX_MOVE_SPEED = 20;
+    private static final double JUMP_STRENGTH = 210;
+    private static final double MAX_MOVE_SPEED = 5 * PIXELS_PER_METER;
     private static final Color ALIVE_COLOR = new Color(50/255.0, 200/255.0, 100/255.0, 1);
     private static final Color DEAD_COLOR = new Color(20/255.0, 100/255.0, 60/255.0, 1);
+
 
     private Vector vel = new Vector(0, 0);
     private final Agent brain;
@@ -105,7 +106,7 @@ public class Player extends GameObj{
         // --- 3. State Inputs ---
         // Clamp values similar to np.clip
         inputs[index++] = (float) Math.clamp(this.vel.x() / MAX_MOVE_SPEED, -1, 1);
-        inputs[index++] = (float) Math.clamp(this.vel.y() / MAX_JUMP, -1, 1);
+        inputs[index++] = (float) Math.clamp(this.vel.y() / JUMP_STRENGTH, -1, 1);
         inputs[index++] = isOnGround ? 1.0f : 0.0f;
 
         // Normalized vector to goal
@@ -123,11 +124,11 @@ public class Player extends GameObj{
 
 
     /**
-     * Set the alive flag to false, change the color, and subtract 100 points.
+     * Set the alive flag to false, change the color, and subtract 150 points.
      */
     public void die() {
         isAlive = false;
-        changeLevelScore(-100);
+        changeLevelScore(-150);
         this.setColor(DEAD_COLOR);
     }
 
@@ -144,9 +145,10 @@ public class Player extends GameObj{
     }
 
     public void jump(double jumpStrength) {
+        // TODO: I don't think the jump strength should be affected by the FPS? Maybe?
         vel = new Vector(vel.x(), -JUMP_STRENGTH * jumpStrength);
         isOnGround = false;
-        changeLevelScore(-4 * jumpStrength);
+        changeLevelScore(-2.5 * jumpStrength);
     }
 
     public void update(Platform[] obstacles, Vector goalPos) {
@@ -156,7 +158,7 @@ public class Player extends GameObj{
 
         for (Platform obs : obstacles) {
             if (checkCollision(this, obs)) {
-                System.out.println("HELP");
+                System.err.print("WARNING: Collision before movement!!\nCheck spawn location or Player.update()");
             }
         }
 
@@ -165,18 +167,18 @@ public class Player extends GameObj{
 
         if (isOnGround) {
             if (Math.abs(horizontal) > MOVEMENT_THRESHOLD) {
-                newVelX += horizontal * 20;
+                newVelX += horizontal * MAX_MOVE_SPEED * 10 / FPS;
             } else {
-                newVelX *= 0.1;
+                newVelX -= (newVelX - newVelX*0.1)/FPS; // TODO: Trying to make drag scaled by the FPS. Normally looks like newVelX *= 0.1;
 
             }
         } else {
             if (Math.abs(horizontal) > MOVEMENT_THRESHOLD) {
-                newVelX += horizontal / 10;
+                newVelX += horizontal / 7 / FPS;
 //                newVelX *= 0.9999;
             } else {
 //            if (Math.abs(horizontal) < MOVEMENT_THRESHOLD) {
-                newVelX *= 0.95;
+//                newVelX = (newVelX - newVelX*0.98)/FPS;    // TODO: Trying to make drag scaled by the FPS. Normally looks like newVelX *= 0.98;
             }
         }
 
@@ -248,7 +250,7 @@ public class Player extends GameObj{
                 if (vel.y() >= 0) {
                     this.pos = new Vector(pos.x(), obs.getPos().y() - this.getDim().y());
                     isOnGround = true;
-                    if (!touched_platforms.contains(obs)) {
+                    if (!touched_platforms.contains(obs) && obs.getDim().x() < 550) {   // TODO: Make checking for floor more general
                         touched_platforms.add(obs);
                         changeLevelScore(70);
                     }
