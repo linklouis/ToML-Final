@@ -59,6 +59,10 @@ public class Player extends GameObj{
         return new RayHit(closestDist, closestObj, closestIsVertical);
     }
 
+    private float normalizeDistance(double distance) {
+        return (float) (2/(1 + Math.pow(Math.E, -distance/70)) - 1);
+    }
+
     public float[] getInputs(Platform[] obstacles, Vector goalPos) {
         Vector origin = this.head();
 
@@ -74,7 +78,7 @@ public class Player extends GameObj{
             RayHit hit = castRay(origin, direction, obstacles);
 
             // Input A: Normalized Distance
-            inputs[index++] = (float) (2/(1 + Math.pow(Math.E, -hit.distance/70)) - 1);
+            inputs[index++] = normalizeDistance(hit.distance);
 
             // Input B: Orientation
             if (hit.object != null) {
@@ -114,8 +118,7 @@ public class Player extends GameObj{
         inputs[index++] = (float) dirToGoal.y();
 
         // Normalized distance to goal (using the ref value from your python code)
-        double refDist = new Vector(600, 400).magnitude();
-        inputs[index++] = (float) (distToGoal / refDist);
+        inputs[index++] = normalizeDistance(distToGoal);
 
         inputs[index++] = (float) lineOfSight;
 
