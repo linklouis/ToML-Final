@@ -407,9 +407,9 @@ public class Main extends Application {
                 new Platform(new Vector(100, 230), new Vector(50, 15), Platform.Type.STANDARD),
                 new Platform(new Vector(0, 180), new Vector(50, 15), Platform.Type.STANDARD),
 
-                new Platform(new Vector(420, 140), new Vector(50, 110), Platform.Type.STANDARD),
-                new Platform(new Vector(490, 210), new Vector(50, 110), Platform.Type.STANDARD),
-                new Platform(new Vector(420, 280), new Vector(50, 110), Platform.Type.STANDARD),
+                new Platform(new Vector(420, 140), new Vector(110, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(490, 210), new Vector(110, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(420, 280), new Vector(110, 15), Platform.Type.STANDARD),
         };
         Level l6 = new Level(1, l6_obs, new Vector(520, 330), new Vector(40, 323) , null, null);
 
