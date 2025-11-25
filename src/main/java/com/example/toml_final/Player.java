@@ -60,7 +60,7 @@ public class Player extends GameObj{
     }
 
     public float[] getInputs(Platform[] obstacles, Vector goalPos) {
-        Vector origin = this.center();
+        Vector origin = this.head();
 
         int numRays = 20;
         float[] inputs = new float[(numRays * 3) + 7]; // 3 inputs per ray + 7 state inputs

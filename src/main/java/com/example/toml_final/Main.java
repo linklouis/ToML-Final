@@ -214,7 +214,7 @@ public class Main extends Application {
         NeuralNetwork template = new NeuralNetwork(NUM_INPUTS);
         template.newLayer(NUM_INPUTS * 4 / 3, n -> Math.max(ActivationFunction.sigmoid().apply(n), 0));
 //        template.newLayer(30, n -> ActivationFunction.sigmoid().apply(n) * 2);
-        template.newLayer(2, n -> ActivationFunction.sigmoid().apply(n));
+        template.newLayer(2, n -> ActivationFunction.sigmoid().apply((float) (n * 1.4)));
 
         generation = new Generation(template, NUM_AGENTS, (int) (NUM_AGENTS*KEEP_RATE), MUTATION_CHANCE, MUTATION_SIZE);
 
@@ -395,6 +395,24 @@ public class Main extends Application {
         };
         Level l5 = new Level(0.3, l5_obs, new Vector(520, 70), new Vector(10, 323) , null, new Rectangle2D(0, 0, 100, 400));
 
+        // Level 6: Up and Over
+        Platform[] l6_obs = {
+                new Platform(new Vector(0, HEIGHT - 50), new Vector(WIDTH, 50), Platform.Type.STANDARD),
+                new Platform(new Vector(-10, 0), new Vector(11, HEIGHT), Platform.Type.STANDARD),
+                new Platform(new Vector(WIDTH - 1, 0), new Vector(11, HEIGHT), Platform.Type.STANDARD),
+
+                new Platform(new Vector(150, 120), new Vector(270, 230), Platform.Type.STANDARD),
+
+                new Platform(new Vector(0, 280), new Vector(50, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(100, 230), new Vector(50, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(0, 180), new Vector(50, 15), Platform.Type.STANDARD),
+
+                new Platform(new Vector(420, 140), new Vector(50, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(490, 210), new Vector(50, 15), Platform.Type.STANDARD),
+                new Platform(new Vector(420, 280), new Vector(50, 15), Platform.Type.STANDARD),
+        };
+        Level l6 = new Level(1, l6_obs, new Vector(520, 330), new Vector(40, 323) , null, null);
+
 
         for (int i = 0; i < 2; i++) {
             levels.add(l1);
@@ -419,6 +437,9 @@ public class Main extends Application {
 
             levels.add(l5);
             levels.add(l5.getReversed(WIDTH));
+
+            levels.add(l6);
+            levels.add(l6.getReversed(WIDTH));
         }
     }
 

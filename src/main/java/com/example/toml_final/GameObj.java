@@ -34,6 +34,10 @@ public class GameObj {
         return new Vector(pos.x() + dim.x() / 2, pos.y() + dim.y() / 2);
     }
 
+    public Vector head() {
+        return new Vector(pos.x() + dim.x() / 2, pos.y());
+    }
+
     public void draw(@NotNull GraphicsContext gc) {
         gc.setFill(color);
         gc.fillRect(pos.x(),pos.y(), dim.x(), dim.y());
