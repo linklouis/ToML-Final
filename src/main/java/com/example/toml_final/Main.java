@@ -27,11 +27,11 @@ public class Main extends Application {
     // Physics Constants
     private static final int MAX_STEPS_PER_LEVEL = 700;
     private static final int TIME_BEFORE_KILL_ZONE = 200;   // When Player.FPS was 60: 1000
-    private static final int NUM_GENS = 1000;
-    private static final int NUM_AGENTS = 1000;
+    private static final int NUM_GENS = 10000;
+    private static final int NUM_AGENTS = 1200;
     private static final double KEEP_RATE = 0.2;
-    private static final double MUTATION_CHANCE = 0.15;
-    private static final double MUTATION_SIZE = 0.2;
+    private static final double MUTATION_CHANCE = 0.1;
+    private static final double MUTATION_SIZE = 0.15;
     private static final int NUM_INPUTS = 20*3 + 7;//55;
 
     // Game State (Volatile is crucial here for thread visibility)
@@ -212,9 +212,9 @@ public class Main extends Application {
 
     private void initSimulation() {
         NeuralNetwork template = new NeuralNetwork(NUM_INPUTS);
-        template.newLayer(NUM_INPUTS * 2 / 3);
-//        template.newLayer(30);
-        template.newLayer(2, ActivationFunction.sigmoid());
+        template.newLayer(NUM_INPUTS * 4 / 3, n -> Math.max(ActivationFunction.sigmoid().apply(n), 0));
+//        template.newLayer(30, n -> ActivationFunction.sigmoid().apply(n) * 2);
+        template.newLayer(2, n -> ActivationFunction.sigmoid().apply(n));
 
         generation = new Generation(template, NUM_AGENTS, (int) (NUM_AGENTS*KEEP_RATE), MUTATION_CHANCE, MUTATION_SIZE);
 
@@ -398,22 +398,26 @@ public class Main extends Application {
 
         for (int i = 0; i < 2; i++) {
             levels.add(l1);
-            levels.add(l2);
-            levels.add(l3);
-            levels.add(l3.getAlt());
-            levels.add(l4);
-            levels.add(l4.getAlt());
-            levels.add(l4a);
-            levels.add(l4a.getAlt());
-            levels.add(l5);
             levels.add(l1.getReversed(WIDTH));
+
+            levels.add(l2);
             levels.add(l2.getReversed(WIDTH));
+
+            levels.add(l3);
             levels.add(l3.getReversed(WIDTH));
+            levels.add(l3.getAlt());
             levels.add(l3.getReversed(WIDTH).getAlt());
+
+            levels.add(l4);
             levels.add(l4.getReversed(WIDTH));
+            levels.add(l4.getAlt());
             levels.add(l4.getReversed(WIDTH).getAlt());
+            levels.add(l4a);
             levels.add(l4a.getReversed(WIDTH));
+            levels.add(l4a.getAlt());
             levels.add(l4a.getReversed(WIDTH).getAlt());
+
+            levels.add(l5);
             levels.add(l5.getReversed(WIDTH));
         }
     }

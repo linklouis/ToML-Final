@@ -74,9 +74,9 @@ public class Player extends GameObj{
             RayHit hit = castRay(origin, direction, obstacles);
 
             // Input A: Normalized Distance
-            inputs[index++] = (float) (hit.distance / MAX_RAY_DISTANCE);
+            inputs[index++] = (float) (2/(1 + Math.pow(Math.E, -hit.distance/70)) - 1);
 
-            // Input B: Orientation (Replaces "Is Solid")
+            // Input B: Orientation
             if (hit.object != null) {
                 // 1.0 for Wall, 0.5 for Floor/Ceiling
                 inputs[index++] = hit.isVertical ? 1.0f : 0.5f;
@@ -148,13 +148,16 @@ public class Player extends GameObj{
         // TODO: I don't think the jump strength should be affected by the FPS? Maybe?
         vel = new Vector(vel.x(), -JUMP_STRENGTH * jumpStrength);
         isOnGround = false;
-//        changeLevelScore(-1.5 * jumpStrength);
+//        changeLevelScore(-1/2.0 * jumpStrength);
     }
 
     public void update(Platform[] obstacles, Vector goalPos) {
         float[] output = brain.predict(getInputs(obstacles, goalPos));
         float horizontal = output[0];
         float jump = output[1];
+//        if (Math.random() < 0.3) {
+//            System.out.println(jump);
+//        }
 
         for (Platform obs : obstacles) {
             if (checkCollision(this, obs)) {
