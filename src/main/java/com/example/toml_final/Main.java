@@ -53,7 +53,7 @@ public class Main extends Application {
     private GraphicsContext gc;
     private GraphicsContext netGc;
 
-    private List<Integer> updatesPerFrame = new LinkedList<Integer>();
+    private List<Integer> updatesPerFrame = new LinkedList<>();
     private int stepOnPrevFrame = 0;
 
     // Lifecycle

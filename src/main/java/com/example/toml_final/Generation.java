@@ -43,10 +43,35 @@ public class Generation {
         Random rand = new Random();
 
         for (int i=best.length; i < agents.length; i++) {
-            Agent parent = best[rand.nextInt(best.length)];
-            nextGenAgents[i] = parent.generateChild(mutationChance, mutationRate);
+            nextGenAgents[i] = randomCrossover(best, rand);
         }
         return new Generation(nextGenAgents, numToKeep, mutationChance, mutationRate);
+    }
+
+    private @NotNull Agent randomCrossover(Agent @NotNull [] best, @NotNull Random rand) {
+        Agent child1 = best[rand.nextInt(best.length)].generateChild(mutationChance, mutationRate);
+        Agent child2 = best[rand.nextInt(best.length)].generateChild(mutationChance, mutationRate);
+        Layer curLayer1 = child1.getNetwork().getInputLayer();
+        Layer curLayer2 = child2.getNetwork().getInputLayer();
+        while (curLayer1.hasNext() && curLayer2.hasNext()) {
+            float[][] weights1 = curLayer1.getWeights();
+            float[][] weights2 = curLayer2.getWeights();
+            for (int i = 0; i < weights1.length; i++) {
+                for (int j = 0; j < weights1[i].length; j++) {
+                    if (rand.nextBoolean()) {
+                        weights1[i][j] = weights2[i][j];
+                    }
+                }
+            }
+            curLayer1 =  curLayer1.getNext();
+            curLayer2 = curLayer2.getNext();
+        }
+        return child1;
+    }
+
+    private Agent clone(Agent @NotNull [] best, @NotNull Random rand) {
+        Agent parent = best[rand.nextInt(best.length)];
+        return parent.generateChild(mutationChance, mutationRate);
     }
 
     private Agent @NotNull [] getBest() {

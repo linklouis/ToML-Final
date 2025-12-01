@@ -131,4 +131,8 @@ public class Layer {
     public Layer getNext() {
         return next;
     }
+
+    public boolean hasNext() {
+        return getNext() != null;
+    }
 }

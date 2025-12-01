@@ -181,4 +181,8 @@ public class NeuralNetwork {
     public int getNumInputs() {
         return numInputs;
     }
+
+    public Layer getInputLayer() {
+        return inputLayer;
+    }
 }
