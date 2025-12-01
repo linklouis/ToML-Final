@@ -14,6 +14,7 @@ import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 
@@ -23,12 +24,14 @@ public class Main extends Application {
     private static final int WIDTH = 600;
     private static final int HEIGHT = 400;
     private static final int INFO_PANE_HEIGHT = 15;
+    private static final int UPDATES_PER_THREAD = 15;
+    private static final int NUM_FRAMES_TO_TRACK = 10;
 
     // Physics Constants
     private static final int MAX_STEPS_PER_LEVEL = 700;
     private static final int TIME_BEFORE_KILL_ZONE = 200;   // When Player.FPS was 60: 1000
     private static final int NUM_GENS = 10000;
-    private static final int NUM_AGENTS = 1200;
+    private static final int NUM_AGENTS = 3000;
     private static final double KEEP_RATE = 0.2;
     private static final double MUTATION_CHANCE = 0.1;
     private static final double MUTATION_SIZE = 0.15;
@@ -49,6 +52,9 @@ public class Main extends Application {
     private Canvas networkCanvas;
     private GraphicsContext gc;
     private GraphicsContext netGc;
+
+    private List<Integer> updatesPerFrame = new LinkedList<Integer>();
+    private int stepOnPrevFrame = 0;
 
     // Lifecycle
     private boolean running = true;
@@ -94,6 +100,11 @@ public class Main extends Application {
 //                if (currentStep >= MAX_STEPS_PER_LEVEL) {
 //                    finishLevel();
 //                }
+                updatesPerFrame.add(currentStep - stepOnPrevFrame);
+                stepOnPrevFrame = currentStep;
+                if (updatesPerFrame.size() > NUM_FRAMES_TO_TRACK) {
+                    updatesPerFrame.removeFirst();
+                }
                 render();
             }
         };
@@ -174,10 +185,9 @@ public class Main extends Application {
         // Draw Info Text
         gc.setFill(Color.WHITE);
         gc.setFont(new Font("Arial", INFO_PANE_HEIGHT));
-        gc.fillText("Gen " + currentGenNum + ", Lvl " + (currentLevelIndex + 1) + ", Step " + currentStep, 10, INFO_PANE_HEIGHT);
+        gc.fillText("Gen " + currentGenNum + ", Lvl " + (currentLevelIndex + 1) + ", Step " + currentStep + ", UPF " + calculateUpdatesPerFrame(), 10, INFO_PANE_HEIGHT);
 
         // --- Draw Network ---
-        // (This section remains unchanged)
         netGc.setFill(Color.rgb(30, 30, 30));
         netGc.fillRect(0, 0, networkCanvas.getWidth(), networkCanvas.getHeight());
 
@@ -239,25 +249,27 @@ public class Main extends Application {
 
         // Parallel Stream for maximum physics throughput
         currentPlayers.parallelStream().forEach(p -> {
-            if (p.isAlive()) {
-                if (stepSnapshot > TIME_BEFORE_KILL_ZONE) {
-                    Rectangle2D kz = currentLevel.getKillZone();
-                    if (p.getPos().x() < kz.getMaxX() && p.right() > kz.getMinX() &&
-                            p.getPos().y() < kz.getMaxY() && p.bottom() > kz.getMinY()) {
-                        p.die();
+            for (int i = 0; i < UPDATES_PER_THREAD; i++) {
+                if (p.isAlive()) {
+                    if (stepSnapshot + i > TIME_BEFORE_KILL_ZONE) {
+                        Rectangle2D kz = currentLevel.getKillZone();
+                        if (p.getPos().x() < kz.getMaxX() && p.right() > kz.getMinX() &&
+                                p.getPos().y() < kz.getMaxY() && p.bottom() > kz.getMinY()) {
+                            p.die();
 //                        p.getBrain().changeScore(80); // Only want them to lose ~20 points for not making it out of the starting area
+                        }
                     }
-                }
-                p.update(currentLevel.getPlatforms(), currentLevel.getGoal());
-                double distToGoal = currentLevel.getGoal().subtract(p.center()).magnitude();
-                if (distToGoal <= 10) {
-                    p.die();
-                    p.changeLevelScore(300);  // Adds 200 since dying removes 100
+                    p.update(currentLevel.getPlatforms(), currentLevel.getGoal());
+                    double distToGoal = currentLevel.getGoal().subtract(p.center()).magnitude();
+                    if (distToGoal <= 10) {
+                        p.die();
+                        p.changeLevelScore(300);  // Adds 200 since dying removes 100
+                    }
                 }
             }
         });
 
-        currentStep++;
+        currentStep += UPDATES_PER_THREAD;
     }
 
     private void finishLevel() {
@@ -287,6 +299,9 @@ public class Main extends Application {
 
         // 4. Reset Players
         resetPlayers(levels.get(currentLevelIndex).getSpawnPos());
+
+        stepOnPrevFrame = 0;
+        updatesPerFrame.clear();
     }
 
     private double scorePlayer(@NotNull Level level, @NotNull Player player) {
@@ -411,7 +426,7 @@ public class Main extends Application {
                 new Platform(new Vector(490, 210), new Vector(110, 15), Platform.Type.STANDARD),
                 new Platform(new Vector(420, 280), new Vector(110, 15), Platform.Type.STANDARD),
         };
-        Level l6 = new Level(1, l6_obs, new Vector(520, 330), new Vector(40, 323) , null, null);
+        Level l6 = new Level(1, l6_obs, new Vector(520, 330), new Vector(40, 323) , new Vector(400, 93), null);
 
 
         for (int i = 0; i < 2; i++) {
@@ -440,10 +455,24 @@ public class Main extends Application {
 
             levels.add(l6);
             levels.add(l6.getReversed(WIDTH));
+            levels.add(l6.getAlt());
+            levels.add(l6.getReversed(WIDTH).getAlt());
         }
     }
 
     static void main(String[] args) {
         launch(args);
+    }
+
+
+    public double calculateUpdatesPerFrame() {
+        if (updatesPerFrame.isEmpty()) { return 0.0; }
+
+        int sum = 0;
+        for (int number : updatesPerFrame) {
+            sum += number;
+        }
+
+        return (double) sum / updatesPerFrame.size();
     }
 }
