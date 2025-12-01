@@ -1,4 +1,4 @@
-package com.example.toml_final;
+package toml_final;
 
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;

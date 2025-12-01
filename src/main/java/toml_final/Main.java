@@ -1,4 +1,4 @@
-package com.example.toml_final;
+package toml_final;
 
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
@@ -13,6 +13,7 @@ import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -24,20 +25,21 @@ public class Main extends Application {
     private static final int WIDTH = 600;
     private static final int HEIGHT = 400;
     private static final int INFO_PANE_HEIGHT = 15;
-    private static final int UPDATES_PER_THREAD = 15;
+    private static final int UPDATES_PER_THREAD = 30;
     private static final int NUM_FRAMES_TO_TRACK = 10;
+    private static final boolean FROM_FILE = true;
 
     // Physics Constants
-    private static final int MAX_STEPS_PER_LEVEL = 700;
-    private static final int TIME_BEFORE_KILL_ZONE = 200;   // When Player.FPS was 60: 1000
+    private static final int MAX_STEPS_PER_LEVEL = 800;
+    private static final int TIME_BEFORE_KILL_ZONE = 230;   // When Player.FPS was 60: 1000
     private static final int NUM_GENS = 10000;
-    private static final int NUM_AGENTS = 3000;
-    private static final double KEEP_RATE = 0.2;
-    private static final double MUTATION_CHANCE = 0.1;
-    private static final double MUTATION_SIZE = 0.15;
+    private static final int NUM_AGENTS = 4000;
+    private static final double KEEP_RATE = 0.3;
+    private static final double MUTATION_CHANCE = 0.8;
+    private static final double MUTATION_SIZE = 0.1;
     private static final int NUM_INPUTS = 20*3 + 7;//55;
 
-    // Game State (Volatile is crucial here for thread visibility)
+    // Game State
     private Generation generation;
     private volatile List<Player> players; // Renderer reads this, Physics writes this
     private List<Level> levels;
@@ -132,7 +134,12 @@ public class Main extends Application {
         gc.fillRect(0, 0, gameCanvas.getWidth(), gameCanvas.getHeight());
 
         if (levels.isEmpty()) return;
-        Level level = levels.get(currentLevelIndex);
+        Level level;
+        if (currentLevelIndex < levels.size()) {
+            level = levels.get(currentLevelIndex);
+        } else {
+            level = levels.getLast();
+        }
         Rectangle2D kz = level.getKillZone();
 
         // Draw Kill Zone
@@ -227,6 +234,16 @@ public class Main extends Application {
         template.newLayer(2, n -> ActivationFunction.sigmoid().apply((float) (n * 1.4)));
 
         generation = new Generation(template, NUM_AGENTS, (int) (NUM_AGENTS*KEEP_RATE), MUTATION_CHANCE, MUTATION_SIZE);
+
+        if (FROM_FILE) {
+            try {
+                ObjectInputStream in = new ObjectInputStream(new BufferedInputStream(new FileInputStream("networks/Current Best.dat")));
+                generation.baseOn((NeuralNetwork) in.readObject());
+                in.close();
+            } catch (IOException | ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        }
 
         createLevels();
         players = populatePlayers(generation);

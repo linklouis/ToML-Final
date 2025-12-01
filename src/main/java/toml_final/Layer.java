@@ -1,8 +1,10 @@
-package com.example.toml_final;
+package toml_final;
 
 import org.jetbrains.annotations.NotNull;
 
-public class Layer {
+import java.io.Serializable;
+
+public class Layer implements Serializable {
     // Weights structure: [Neuron Index][Input Index + 1]
     // weights[i][0] = Bias for neuron i
     // weights[i][1...n] = Weights for inputs

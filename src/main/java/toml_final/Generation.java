@@ -1,7 +1,8 @@
-package com.example.toml_final;
+package toml_final;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Random;
@@ -39,6 +40,11 @@ public class Generation {
         }
         Agent[] nextGenAgents = new Agent[agents.length];
         System.arraycopy(best, 0, nextGenAgents, 0, best.length);
+        try {
+            best[0].getNetwork().save("networks/Current Best");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
         Random rand = new Random();
 
@@ -77,6 +83,14 @@ public class Generation {
     private Agent @NotNull [] getBest() {
         Arrays.sort(agents, Comparator.comparingDouble(Agent::getScore).reversed());
         return Arrays.copyOfRange(agents, 0, numToKeep);
+    }
+
+    public void baseOn(NeuralNetwork parent) {
+        Agent parentAgent = new Agent(parent);
+
+        for (int i=0; i < agents.length; i++) {
+            agents[i] = parentAgent.generateChild(mutationChance, mutationRate);
+        }
     }
 
 

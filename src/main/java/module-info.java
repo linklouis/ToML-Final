@@ -5,6 +5,6 @@ module com.example.toml_final {
     requires org.jetbrains.annotations;
 
 
-    opens com.example.toml_final to javafx.fxml;
-    exports com.example.toml_final;
+    opens toml_final to javafx.fxml;
+    exports toml_final;
 }

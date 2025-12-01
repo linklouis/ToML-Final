@@ -1,4 +1,4 @@
-package com.example.toml_final;
+package toml_final;
 
 import javafx.geometry.Rectangle2D;
 import org.jetbrains.annotations.Nullable;

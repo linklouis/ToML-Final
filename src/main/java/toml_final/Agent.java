@@ -1,4 +1,4 @@
-package com.example.toml_final;
+package toml_final;
 
 public class Agent {
     private float score = 0;

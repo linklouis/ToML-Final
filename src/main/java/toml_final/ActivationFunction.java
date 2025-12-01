@@ -1,9 +1,11 @@
-package com.example.toml_final;
+package toml_final;
 
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-public interface ActivationFunction {
+import java.io.Serializable;
+
+public interface ActivationFunction extends Serializable {
     float apply(float input);
 
     @Contract(pure = true)

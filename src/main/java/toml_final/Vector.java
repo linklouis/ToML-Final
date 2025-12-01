@@ -1,4 +1,4 @@
-package com.example.toml_final;
+package toml_final;
 
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;

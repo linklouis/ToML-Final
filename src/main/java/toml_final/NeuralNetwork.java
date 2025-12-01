@@ -1,8 +1,10 @@
-package com.example.toml_final;
+package toml_final;
 
 import org.jetbrains.annotations.NotNull;
 
-public class NeuralNetwork {
+import java.io.*;
+
+public class NeuralNetwork implements Serializable {
     private final int numInputs;
     private Layer inputLayer = null;
 
@@ -172,6 +174,12 @@ public class NeuralNetwork {
 
     public NeuralNetwork child(double mutationChance, double mutationSize) {
         return new NeuralNetwork(inputLayer.child(mutationChance, mutationSize));
+    }
+
+    public void save(String filename) throws IOException {
+        ObjectOutputStream out = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(filename + ".dat")));
+        out.writeObject(this);
+        out.close();
     }
 
     public NeuralNetwork randCopy() {
