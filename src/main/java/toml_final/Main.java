@@ -25,14 +25,14 @@ public class Main extends Application {
     private static final int WIDTH = 600;
     private static final int HEIGHT = 400;
     private static final int INFO_PANE_HEIGHT = 15;
-    private static final int UPDATES_PER_THREAD = 30;
+    private static final int UPDATES_PER_THREAD = 1;//30;
     private static final int NUM_FRAMES_TO_TRACK = 10;
-    private static final boolean FROM_FILE = true;
+    private static final boolean FROM_FILE = false;
 
     // Physics Constants
     private static final int MAX_STEPS_PER_LEVEL = 800;
     private static final int TIME_BEFORE_KILL_ZONE = 230;   // When Player.FPS was 60: 1000
-    private static final int NUM_GENS = 10000;
+    private static final int NUM_GENS = 10000000;
     private static final int NUM_AGENTS = 4000;
     private static final double KEEP_RATE = 0.3;
     private static final double MUTATION_CHANCE = 0.8;
