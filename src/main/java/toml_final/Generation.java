@@ -63,10 +63,9 @@ public class Generation {
             float[][] weights1 = curLayer1.getWeights();
             float[][] weights2 = curLayer2.getWeights();
             for (int i = 0; i < weights1.length; i++) {
-                for (int j = 0; j < weights1[i].length; j++) {
-                    if (rand.nextBoolean()) {
-                        weights1[i][j] = weights2[i][j];
-                    }
+                if (rand.nextBoolean()) {
+//                    System.arraycopy(weights2[i], 0, weights1[i], 0, weights1[i].length);
+                    weights1[i] = weights2[i];
                 }
             }
             curLayer1 =  curLayer1.getNext();

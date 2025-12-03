@@ -25,17 +25,17 @@ public class Main extends Application {
     private static final int WIDTH = 600;
     private static final int HEIGHT = 400;
     private static final int INFO_PANE_HEIGHT = 15;
-    private static final int UPDATES_PER_THREAD = 1;//30;
-    private static final int NUM_FRAMES_TO_TRACK = 10;
+    private static final int UPDATES_PER_THREAD = 40;
+    private static final int NUM_FRAMES_TO_TRACK = 30;
     private static final boolean FROM_FILE = false;
 
     // Physics Constants
-    private static final int MAX_STEPS_PER_LEVEL = 800;
-    private static final int TIME_BEFORE_KILL_ZONE = 230;   // When Player.FPS was 60: 1000
+    private static final int MAX_STEPS_PER_LEVEL = 1100;
+    private static final int TIME_BEFORE_KILL_ZONE = 300;   // When Player.FPS was 60: 1000
     private static final int NUM_GENS = 10000000;
-    private static final int NUM_AGENTS = 4000;
+    private static final int NUM_AGENTS = 3000;
     private static final double KEEP_RATE = 0.3;
-    private static final double MUTATION_CHANCE = 0.8;
+    private static final double MUTATION_CHANCE = 0.08;
     private static final double MUTATION_SIZE = 0.1;
     private static final int NUM_INPUTS = 20*3 + 7;//55;
 
@@ -229,9 +229,9 @@ public class Main extends Application {
 
     private void initSimulation() {
         NeuralNetwork template = new NeuralNetwork(NUM_INPUTS);
-        template.newLayer(NUM_INPUTS * 4 / 3, n -> Math.max(ActivationFunction.sigmoid().apply(n), 0));
+        template.newLayer(NUM_INPUTS * 4 / 3, n -> Math.max(ActivationFunction.negativeInclusiveSigmoid().apply(n), 0));
 //        template.newLayer(30, n -> ActivationFunction.sigmoid().apply(n) * 2);
-        template.newLayer(2, n -> ActivationFunction.sigmoid().apply((float) (n * 1.4)));
+        template.newLayer(2, n -> ActivationFunction.negativeInclusiveSigmoid().apply((float) (n * 1.4)));
 
         generation = new Generation(template, NUM_AGENTS, (int) (NUM_AGENTS*KEEP_RATE), MUTATION_CHANCE, MUTATION_SIZE);
 
@@ -355,7 +355,7 @@ public class Main extends Application {
                 new Platform(new Vector(140, HEIGHT - 51), new Vector(50, 10), Platform.Type.KILL),
                 new Platform(new Vector(290, HEIGHT - 51), new Vector(320-290, 10), Platform.Type.KILL)
         };
-        Level l1 = new Level(2, l1_obs, new Vector(500, 300), new Vector(5, 322), null, new Rectangle2D(0, 0, 100, 400));
+        Level l1 = new Level(3, l1_obs, new Vector(500, 300), new Vector(5, 322), null, new Rectangle2D(0, 0, 100, 400));
 
         // Level 2: Evan
         Platform[] l2_obs = {
@@ -372,7 +372,7 @@ public class Main extends Application {
                 new Platform(new Vector(350, 290), new Vector(50, 10), Platform.Type.KILL),
                 new Platform(new Vector(249, 210), new Vector(10, 200), Platform.Type.STANDARD)
         };
-        Level l2 = new Level(3, l2_obs, new Vector(230, 190), new Vector(5, 322), new Vector(500, 322), new Rectangle2D(0, 0, 80, 400));
+        Level l2 = new Level(4, l2_obs, new Vector(230, 190), new Vector(5, 322), new Vector(500, 322), new Rectangle2D(0, 0, 80, 400));
 
         // Level 3: Vertical
         Platform[] l3_obs = {
@@ -390,7 +390,7 @@ public class Main extends Application {
                 new Platform(new Vector(0, HEIGHT - 51), new Vector(100, 10), Platform.Type.KILL),
                 new Platform(new Vector(WIDTH - 100, HEIGHT - 51), new Vector(100, 10), Platform.Type.KILL)
         };
-        Level l3 = new Level(1.2, l3_obs, new Vector(85+250, 10), new Vector(80+250, 323), new Vector(20+250, 180),null);// new Rectangle2D(0, 300, 170, 50));
+        Level l3 = new Level(0.7, l3_obs, new Vector(85+250, 10), new Vector(80+250, 323), new Vector(20+250, 180),null);// new Rectangle2D(0, 300, 170, 50));
 
         // Level 4: Hannah
         Platform[] l4_obs = {

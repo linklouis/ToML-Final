@@ -12,7 +12,7 @@ public class Player extends GameObj{
     private static final double PIXELS_PER_METER = 25/0.5;
     private static final double MOVEMENT_THRESHOLD = 0.2;
     private static final double G = 9.8;
-    private static final double JUMP_THRESHOLD = 0.3;
+    private static final double JUMP_THRESHOLD = 0;
     private static final double FPS = 60;
     private static final double MAX_RAY_DISTANCE = 500.0;
     private static final double JUMP_STRENGTH = 6;
@@ -60,7 +60,9 @@ public class Player extends GameObj{
     }
 
     private float normalizeDistance(double distance) {
-        return (float) (2/(1 + Math.pow(Math.E, -distance/70)) - 1);
+//        return (float) (2/(1 + Math.exp(-distance/100)) - 1);
+        return (float) (4/(1 + Math.exp(-distance/120)) - 3);
+
     }
 
     public float[] getInputs(Platform[] obstacles, Vector goalPos) {
@@ -89,7 +91,7 @@ public class Player extends GameObj{
                 boolean isDangerous = hit.object.getType() == Platform.Type.KILL;
                 inputs[index++] = isDangerous ? 1.0f : 0.0f;
             } else {
-                inputs[index++] = 0.0f; // Empty
+                inputs[index++] = normalizeDistance(MAX_RAY_DISTANCE);
                 inputs[index++] = 0.0f; // Safe
             }
         }
@@ -151,7 +153,7 @@ public class Player extends GameObj{
         // TODO: I don't think the jump strength should be affected by the FPS? Maybe?
         vel = new Vector(vel.x(), -JUMP_STRENGTH * jumpStrength);
         isOnGround = false;
-//        changeLevelScore(-1/2.0 * jumpStrength);
+        changeLevelScore(-1/3.0 * jumpStrength);
     }
 
     public void update(Platform[] obstacles, Vector goalPos) {
