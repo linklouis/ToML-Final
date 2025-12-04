@@ -30,8 +30,6 @@ public class Level {
         for (int i = 0; i < platforms.length; i++) {
             Platform p = platforms[i];
 
-            // Logic: screen_width - (platform.pos.x + platform.dim.x)
-            // We calculate the new X position by subtracting the Right Edge from the screen width
             double newX = screenWidth - (p.getPos().x() + p.getDim().x());
 
             // Create new platform with mirrored position but same dimensions/type
@@ -47,25 +45,24 @@ public class Level {
         Vector reversedGoal = new Vector(screenWidth - goal.x(), goal.y());
 
         // Reverse Spawn
-        // Python: Vector(screen_width, self.spawn_pos.y) - Vector(self.spawn_pos.x + 10, 0)
-        // Note the '10' padding preserved from your Python logic
         Vector reversedSpawn = new Vector(screenWidth - (spawnPos.x() + 10), spawnPos.y());
 
         // Reverse Alt Spawn
         Vector reversedAltSpawn = new Vector(screenWidth - (alternateSpawn.x() + 10), alternateSpawn.y());
 
         // Reverse Kill Zone
-        // Python: screen_width - self.kill_zone.right
-        // JavaFX: getMaxX() is equivalent to .right
         double kzNewX = screenWidth - killZone.getMaxX();
         Rectangle2D reversedKillZone = new Rectangle2D(kzNewX, killZone.getMinY(), killZone.getWidth(), killZone.getHeight());
 
         return new Level(weight, reversedPlatforms, reversedGoal, reversedSpawn, reversedAltSpawn, reversedKillZone);
     }
 
+    /**
+     * Creates a level using the alternate spawn as the main spawn
+     * Passing 'null' for alternateSpawn makes the constructor set it to the new main spawn
+     * @return A new Level with the alternate spawn as the main spawn
+     */
     public Level getAlt() {
-        // Creates a level using the alternate spawn as the main spawn
-        // Passing 'null' for alternateSpawn makes the constructor set it to the new main spawn
         return new Level(weight, platforms, goal, alternateSpawn, null, killZone);
     }
 
@@ -75,8 +72,5 @@ public class Level {
     public Vector getSpawnPos() { return spawnPos; }
     public Vector getAlternateSpawn() { return alternateSpawn; }
     public Rectangle2D getKillZone() { return killZone; }
-
-    public double getWeight() {
-        return weight;
-    }
+    public double getWeight() { return weight; }
 }

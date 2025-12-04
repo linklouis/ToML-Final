@@ -8,9 +8,9 @@ import java.util.Comparator;
 import java.util.Random;
 
 public class Generation {
-    private int numToKeep;
-    private double mutationChance, mutationRate;
-    private Agent[] agents;
+    private final int numToKeep;
+    private final double mutationChance, mutationRate;
+    private final Agent[] agents;
 
     public Generation(Agent[] agents, int numToKeep, double mutationChance, double mutationRate) {
         this.agents = agents;
@@ -84,6 +84,10 @@ public class Generation {
         return Arrays.copyOfRange(agents, 0, numToKeep);
     }
 
+    /**
+     * Replaces all of the agents in this generation with children of one parent.
+     * @param parent
+     */
     public void baseOn(NeuralNetwork parent) {
         Agent parentAgent = new Agent(parent);
 

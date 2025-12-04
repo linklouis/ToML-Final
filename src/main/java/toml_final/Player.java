@@ -13,7 +13,11 @@ public class Player extends GameObj{
     private static final double MOVEMENT_THRESHOLD = 0.2;
     private static final double G = 9.8;
     private static final double JUMP_THRESHOLD = 0;
-    private static final double FPS = 60;
+    /**
+     * Stands for "Updates per Simulated Second."
+     * It's the number of times the Players can take an action per second of simulated time.
+     */
+    private static final double UPSS = 60;
     private static final double MAX_RAY_DISTANCE = 500.0;
     private static final double JUMP_STRENGTH = 6;
     private static final double MAX_MOVE_SPEED = 9.2/PIXELS_PER_METER*25/1.8;   // Human av is 8.8
@@ -150,7 +154,7 @@ public class Player extends GameObj{
     }
 
     public void jump(double jumpStrength) {
-        // TODO: I don't think the jump strength should be affected by the FPS? Maybe?
+        // I don't think the jump strength should be affected by the FPS? Maybe?
         vel = new Vector(vel.x(), -JUMP_STRENGTH * jumpStrength);
         isOnGround = false;
         changeLevelScore(-1/3.0 * jumpStrength);
@@ -160,13 +164,11 @@ public class Player extends GameObj{
         float[] output = brain.predict(getInputs(obstacles, goalPos));
         float horizontal = output[0];
         float jump = output[1];
-//        if (Math.random() < 0.3) {
-//            System.out.println(jump);
-//        }
 
         for (Platform obs : obstacles) {
             if (checkCollision(this, obs)) {
-                System.err.print("WARNING: Collision before movement!!\nCheck spawn location or Player.update()");
+                System.err.print("WARNING: Collision occurred before movement in Player.update()!!" +
+                        "\nCheck spawn location! If not an issue, then idk, you might be cooked.");
             }
         }
 
@@ -177,16 +179,14 @@ public class Player extends GameObj{
             if (Math.abs(horizontal) > MOVEMENT_THRESHOLD) {
                 newVelX = horizontal * MAX_MOVE_SPEED;
             } else {
-                newVelX -= (newVelX - newVelX*0.1)/FPS; // TODO: Trying to make drag scaled by the FPS. Normally looks like newVelX *= 0.1;
+                newVelX -= (newVelX - newVelX*0.1)/ UPSS; // Trying to make drag scaled by the FPS. Normally looks like newVelX *= 0.1;
 
             }
         } else {
             if (Math.abs(horizontal) > MOVEMENT_THRESHOLD) {
-                newVelX += horizontal * MAX_MOVE_SPEED / 7 / FPS;
-//                newVelX *= 0.9999;
+                newVelX += horizontal * MAX_MOVE_SPEED / 7 / UPSS;
             } else {
-//            if (Math.abs(horizontal) < MOVEMENT_THRESHOLD) {
-                newVelX -= (newVelX - newVelX*0.98)/FPS;    // TODO: Trying to make drag scaled by the FPS. Normally looks like newVelX *= 0.98;
+                newVelX -= (newVelX - newVelX*0.98)/ UPSS;    // Trying to make drag scaled by the FPS. Normally looks like newVelX *= 0.98;
             }
         }
 
@@ -194,7 +194,7 @@ public class Player extends GameObj{
         vel = new Vector(newVelX, vel.y());
 
         // Move X
-        this.pos = new Vector(pos.x() + vel.x() * PIXELS_PER_METER / FPS, pos.y());
+        this.pos = new Vector(pos.x() + vel.x() * PIXELS_PER_METER / UPSS, pos.y());
 
         // --- X AXIS COLLISIONS ---
         for (Platform obs : obstacles) {
@@ -203,17 +203,6 @@ public class Player extends GameObj{
                     die();
                     return;
                 }
-
-                // Calculate overlap on both axes
-//                double overlapX = Math.min(this.right(), obs.right()) - Math.max(this.left(), obs.left());
-//                double overlapY = Math.min(this.bottom(), obs.bottom()) - Math.max(this.top(), obs.top());
-//
-//                // If the Y overlap is significantly smaller than X overlap,
-//                // we are just skimming the surface (floor/ceiling).
-//                // Ignore this collision in the X-loop; let the Y-loop handle it.
-//                if (overlapY < overlapX) {
-//                    continue;
-//                }
 
                 if (vel.x() > 0) {
                     this.pos = new Vector(obs.getPos().x() - this.getDim().x(), pos.y());
@@ -226,13 +215,13 @@ public class Player extends GameObj{
         }
 
         // --- Y AXIS PHYSICS ---
-        vel = new Vector(vel.x(), vel.y() + G / FPS);
+        vel = new Vector(vel.x(), vel.y() + G / UPSS);
 
         if (isOnGround && jump > JUMP_THRESHOLD) {
             jump((jump - JUMP_THRESHOLD) / (1 - JUMP_THRESHOLD));
         }
 
-        this.pos = new Vector(pos.x(), pos.y() + vel.y() * PIXELS_PER_METER / FPS);
+        this.pos = new Vector(pos.x(), pos.y() + vel.y() * PIXELS_PER_METER / UPSS);
 
         // --- Y AXIS COLLISIONS ---
         isOnGround = false;
@@ -243,17 +232,6 @@ public class Player extends GameObj{
                     die();
                     return;
                 }
-                // We need the same overlap logic here that we used in the X loop,
-                // but inverted. We want to ignore "Walls" while calculating "Floors/Ceilings".
-
-//                double overlapX = Math.min(this.right(), obs.right()) - Math.max(this.left(), obs.left());
-//                double overlapY = Math.min(this.bottom(), obs.bottom()) - Math.max(this.top(), obs.top());
-//
-//                // If the X overlap is smaller than the Y overlap, it's a Wall hit.
-//                // Ignore it in this Y-loop (the X-loop handled it already).
-//                if (overlapX < overlapY) {
-//                    continue;
-//                }
 
                 if (vel.y() >= 0) {
                     this.pos = new Vector(pos.x(), obs.getPos().y() - this.getDim().y());
@@ -294,8 +272,7 @@ public class Player extends GameObj{
         normalizedScore = Math.max(0, Math.min(1, normalizedScore));
 
         // HSB Color Model:
-        // Hue 0 = Red, Hue 60 = Yellow, Hue 120 = Green.
-        // We map our 0.0-1.0 score to the 0-120 Hue range.
+        // [Green] Map our 0.0-1.0 score to the 0-120 Hue range.
         double hue = normalizedScore * 120;
 
         // Saturation 1.0 (Vibrant), Brightness 1.0 (Bright)

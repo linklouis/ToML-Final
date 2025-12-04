@@ -1,6 +1,7 @@
 package toml_final;
 
 import javafx.scene.paint.Color;
+import org.jetbrains.annotations.NotNull;
 
 public class Platform extends GameObj {
     private Type type;
@@ -18,7 +19,7 @@ public class Platform extends GameObj {
         }
     }
 
-    public Platform(Vector pos, Vector dim, Type type) {
+    public Platform(Vector pos, Vector dim, @NotNull Type type) {
         super(pos, dim, type.getColor());
         this.type = type;
     }

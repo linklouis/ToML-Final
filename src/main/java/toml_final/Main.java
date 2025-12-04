@@ -17,19 +17,19 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Random;
 
 public class Main extends Application {
 
-    // Constants
+    // Utility Constants
     private static final int WIDTH = 600;
     private static final int HEIGHT = 400;
     private static final int INFO_PANE_HEIGHT = 15;
     private static final int UPDATES_PER_THREAD = 40;
     private static final int NUM_FRAMES_TO_TRACK = 30;
     private static final boolean FROM_FILE = false;
+    private static final boolean REAL_TIME_MODE = false;
 
-    // Physics Constants
+    // Sim Constants
     private static final int MAX_STEPS_PER_LEVEL = 1100;
     private static final int TIME_BEFORE_KILL_ZONE = 300;   // When Player.FPS was 60: 1000
     private static final int NUM_GENS = 10000000;
@@ -55,11 +55,16 @@ public class Main extends Application {
     private GraphicsContext gc;
     private GraphicsContext netGc;
 
-    private List<Integer> updatesPerFrame = new LinkedList<>();
+    private final List<Integer> updatesPerFrame = new LinkedList<>();
     private int stepOnPrevFrame = 0;
 
     // Lifecycle
     private boolean running = true;
+
+
+    /*
+     * Initialization:
+     */
 
     @Override
     public void start(@NotNull Stage stage) {
@@ -79,7 +84,7 @@ public class Main extends Application {
         stage.show();
 
         // Stop everything when window closes
-        stage.setOnCloseRequest(e -> {
+        stage.setOnCloseRequest(_ -> {
             running = false;
             System.exit(0);
         });
@@ -88,29 +93,70 @@ public class Main extends Application {
         initSimulation();
 
         // 3. Start Physics Thread
-        Thread physicsThread = new Thread(this::physicsLoop);
-        physicsThread.setDaemon(true);
-        physicsThread.setPriority(Thread.MAX_PRIORITY);
-        physicsThread.start();
+        if (!REAL_TIME_MODE) {
+            Thread physicsThread = new Thread(this::physicsLoop);
+            physicsThread.setDaemon(true);
+            physicsThread.setPriority(Thread.MAX_PRIORITY);
+            physicsThread.start();
+        }
 
         // 4. Start Render Thread
         AnimationTimer renderLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
-//                updatePhysics();
-//
-//                if (currentStep >= MAX_STEPS_PER_LEVEL) {
-//                    finishLevel();
-//                }
+                // Optional Physics Logic
+                if (REAL_TIME_MODE) {
+                    updatePhysics();
+
+                    if (currentStep >= MAX_STEPS_PER_LEVEL) {
+                        finishLevel();
+                    }
+                }
+
+                // Update Rate Tracking
                 updatesPerFrame.add(currentStep - stepOnPrevFrame);
                 stepOnPrevFrame = currentStep;
                 if (updatesPerFrame.size() > NUM_FRAMES_TO_TRACK) {
                     updatesPerFrame.removeFirst();
                 }
+
+                // Rendering
                 render();
             }
         };
         renderLoop.start();
+    }
+
+    private void initSimulation() {
+        NeuralNetwork template = new NeuralNetwork(NUM_INPUTS);
+        // Set up a custom
+        template.newLayer(NUM_INPUTS * 4 / 3, ActivationFunction.outputLimitedLeakyReLU());
+//        template.newLayer(30, n -> ActivationFunction.sigmoid().apply(n) * 2);
+        template.newLayer(2, n -> ActivationFunction.negativeInclusiveSigmoid().apply((float) (n * 1.4)));
+
+        generation = new Generation(template, NUM_AGENTS, (int) (NUM_AGENTS*KEEP_RATE), MUTATION_CHANCE, MUTATION_SIZE);
+
+        if (FROM_FILE) {
+            try {
+                ObjectInputStream in = new ObjectInputStream(new BufferedInputStream(new FileInputStream("networks/Current Best.dat")));
+                generation.baseOn((NeuralNetwork) in.readObject());
+                in.close();
+            } catch (IOException | ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        createLevels();
+        players = populatePlayers(generation);
+        resetPlayers(levels.getFirst().getSpawnPos());
+    }
+
+    private @NotNull List<Player> populatePlayers(@NotNull Generation gen) {
+        List<Player> newPlayers = new ArrayList<>();
+        for (int i = 0; i < gen.getSize(); i++) {
+            newPlayers.add(new Player(new Vector(0, 0), new Vector(10, 25), gen.getAgents()[i]));
+        }
+        return newPlayers;
     }
 
     // --- THREAD 1: The Physics Loop ---
@@ -227,37 +273,6 @@ public class Main extends Application {
     // LOGIC METHODS (Primarily Physics Thread stuff)
     // ---------------------------------------------------------
 
-    private void initSimulation() {
-        NeuralNetwork template = new NeuralNetwork(NUM_INPUTS);
-        template.newLayer(NUM_INPUTS * 4 / 3, n -> Math.max(ActivationFunction.negativeInclusiveSigmoid().apply(n), 0));
-//        template.newLayer(30, n -> ActivationFunction.sigmoid().apply(n) * 2);
-        template.newLayer(2, n -> ActivationFunction.negativeInclusiveSigmoid().apply((float) (n * 1.4)));
-
-        generation = new Generation(template, NUM_AGENTS, (int) (NUM_AGENTS*KEEP_RATE), MUTATION_CHANCE, MUTATION_SIZE);
-
-        if (FROM_FILE) {
-            try {
-                ObjectInputStream in = new ObjectInputStream(new BufferedInputStream(new FileInputStream("networks/Current Best.dat")));
-                generation.baseOn((NeuralNetwork) in.readObject());
-                in.close();
-            } catch (IOException | ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        createLevels();
-        players = populatePlayers(generation);
-        resetPlayers(levels.getFirst().getSpawnPos());
-    }
-
-    private @NotNull List<Player> populatePlayers(@NotNull Generation gen) {
-        List<Player> newPlayers = new ArrayList<>();
-        for (int i = 0; i < gen.getSize(); i++) {
-            newPlayers.add(new Player(new Vector(0, 0), new Vector(10, 25), gen.getAgents()[i]));
-        }
-        return newPlayers;
-    }
-
     private void updatePhysics() {
         // Grab local ref for thread safety
         List<Player> currentPlayers = players;
@@ -273,14 +288,14 @@ public class Main extends Application {
                         if (p.getPos().x() < kz.getMaxX() && p.right() > kz.getMinX() &&
                                 p.getPos().y() < kz.getMaxY() && p.bottom() > kz.getMinY()) {
                             p.die();
-//                        p.getBrain().changeScore(80); // Only want them to lose ~20 points for not making it out of the starting area
+                        p.getBrain().changeScore(20); // Only want them to lose ~80 points for not making it out of the starting area
                         }
                     }
                     p.update(currentLevel.getPlatforms(), currentLevel.getGoal());
                     double distToGoal = currentLevel.getGoal().subtract(p.center()).magnitude();
                     if (distToGoal <= 10) {
                         p.die();
-                        p.changeLevelScore(300);  // Adds 200 since dying removes 100
+                        p.changeLevelScore(300);  // Adds 200 total since "dying" removes 100
                     }
                 }
             }
@@ -295,7 +310,7 @@ public class Main extends Application {
 
         // 1. Calculate Scores
         currentPlayers.parallelStream().forEach(p -> {
-            p.changeLevelScore(scorePlayer(level, p));
+            p.changeLevelScore(scorePlayer(p));
             p.updateScore(level.getWeight());
         });
 
@@ -321,15 +336,13 @@ public class Main extends Application {
         updatesPerFrame.clear();
     }
 
-    private double scorePlayer(@NotNull Level level, @NotNull Player player) {
-//        double distToGoal = level.getGoal().subtract(player.getPos()).magnitude();
-        return - (/*(distToGoal / 2.5) +*/ player.getMinDistToGoal())/5;
+    private double scorePlayer(@NotNull Player player) {
+        return - player.getMinDistToGoal()/5;
     }
 
     private void resetPlayers(Vector spawn) {
-        Random rand = new Random();
         List<Player> currentPlayers = players;
-        // Parallel reset is safe as long as Random is thread-local or we create new ones
+        // Parallel reset is safe as long as Random is thread-local, or we create new ones
         currentPlayers.parallelStream().forEach(p -> {
             // Create a local Random to avoid contention on the shared Math.random()
             java.util.concurrent.ThreadLocalRandom localRand = java.util.concurrent.ThreadLocalRandom.current();
@@ -344,6 +357,7 @@ public class Main extends Application {
         levels = new ArrayList<>();
 
         // Level 1
+        // TODO: Agents have particular issues with this one. Probably because it encourages them to learn to not constantly jump by killing them if they jump at the start
         Platform[] l1_obs = {
                 new Platform(new Vector(0, HEIGHT - 50), new Vector(WIDTH, 50), Platform.Type.STANDARD),
                 new Platform(new Vector(-10, 0), new Vector(11, HEIGHT), Platform.Type.STANDARD),
@@ -358,6 +372,7 @@ public class Main extends Application {
         Level l1 = new Level(3, l1_obs, new Vector(500, 300), new Vector(5, 322), null, new Rectangle2D(0, 0, 100, 400));
 
         // Level 2: Evan
+        // TODO: Agents have particular issues with this one. Probably because it encourages them to learn to not constantly jump by killing them if they jump at the start
         Platform[] l2_obs = {
                 new Platform(new Vector(0, HEIGHT - 50), new Vector(WIDTH, 50), Platform.Type.STANDARD),
                 new Platform(new Vector(-10, 0), new Vector(11, HEIGHT), Platform.Type.STANDARD),
@@ -455,8 +470,8 @@ public class Main extends Application {
 
             levels.add(l3);
             levels.add(l3.getReversed(WIDTH));
-            levels.add(l3.getAlt());
-            levels.add(l3.getReversed(WIDTH).getAlt());
+//            levels.add(l3.getAlt());
+//            levels.add(l3.getReversed(WIDTH).getAlt());
 
             levels.add(l4);
             levels.add(l4.getReversed(WIDTH));
@@ -477,11 +492,6 @@ public class Main extends Application {
         }
     }
 
-    static void main(String[] args) {
-        launch(args);
-    }
-
-
     public double calculateUpdatesPerFrame() {
         if (updatesPerFrame.isEmpty()) { return 0.0; }
 
@@ -491,5 +501,9 @@ public class Main extends Application {
         }
 
         return (double) sum / updatesPerFrame.size();
+    }
+
+    static void main(String[] args) {
+        launch(args);
     }
 }
