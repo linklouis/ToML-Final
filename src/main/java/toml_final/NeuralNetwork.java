@@ -39,7 +39,7 @@ public class NeuralNetwork implements Serializable {
     }
 
     public void display(javafx.scene.canvas.GraphicsContext gc, double width, double height) {
-        // 1. Flatten the linked list into a generic list for easier iteration
+        // 1. Flatten the linked list into a generic list
         java.util.List<Layer> layers = new java.util.ArrayList<>();
         Layer current = inputLayer;
         while (current != null) {
@@ -52,15 +52,12 @@ public class NeuralNetwork implements Serializable {
         float maxWeight = 0;
 
         for (Layer layer : layers) {
-            float[][] weights = layer.getWeights();
-            for (float[] neuron : weights) {
-                for (float w : neuron) {
-                    if (w < minWeight) minWeight = w;
-                    if (w > maxWeight) maxWeight = w;
-                }
+            float[] w = layer.getWeights(); // 1D Array
+            for (float val : w) {
+                if (val < minWeight) minWeight = val;
+                if (val > maxWeight) maxWeight = val;
             }
         }
-        // Prevent division by zero if weights are all 0
         if (maxWeight == 0) maxWeight = 1;
         if (minWeight == 0) minWeight = -1;
 
@@ -74,7 +71,6 @@ public class NeuralNetwork implements Serializable {
         for (int i = 0; i < numInputs; i++) {
             double nodeDist;
             double y;
-            // Logic to stagger/center nodes based on count
             if (numInputs % 2 == 0) {
                 nodeDist = height / (numInputs + 1);
                 y = nodeDist * i + nodeDist * 1.125;
@@ -86,7 +82,6 @@ public class NeuralNetwork implements Serializable {
             Vector pos = new Vector(10, y);
             previousPositions.add(pos);
 
-            // Draw Input Circle (White)
             gc.setFill(Color.WHITE);
             double r = 2 * scale;
             gc.fillOval(pos.x() - r, pos.y() - r, r * 2, r * 2);
@@ -95,8 +90,11 @@ public class NeuralNetwork implements Serializable {
         // 5. Iterate and Draw Layers
         for (int i = 0; i < layers.size(); i++) {
             Layer layer = layers.get(i);
-            float[][] weights = layer.getWeights(); // dimensions: [neurons][inputs + 1]
-            int numNeurons = weights.length;
+
+            // --- NEW: Handle 1D Array ---
+            float[] weights = layer.getWeights();
+            int numNeurons = layer.size();
+            int stride = layer.getStride(); // How wide is one neuron's data? (Inputs + 1)
 
             double x = layerDist * (i + 1) + 10;
             java.util.List<Vector> nodePositions = new java.util.ArrayList<>();
@@ -113,31 +111,36 @@ public class NeuralNetwork implements Serializable {
                 }
                 Vector curPos = new Vector(x, y);
 
-                // Draw Connections to previous layer
-                // weights[j][0] is Bias. weights[j][1...n] are connections.
-                for (int n = 1; n < weights[j].length; n++) {
-                    float w = weights[j][n];
+                // --- NEW: Calculate Index manually ---
+                // Start index for this neuron in the 1D array
+                int neuronStartIndex = j * stride;
 
-                    // Determine Color
+                // The first value is Bias (index + 0)
+                // The subsequent values are weights (index + 1 to index + n)
+
+                // Draw Connections
+                for (int n = 1; n < stride; n++) {
+                    // Safety check in case previous layer size doesn't match stride logic
+                    if (n - 1 >= previousPositions.size()) break;
+
+                    // Get weight value from 1D array
+                    float w = weights[neuronStartIndex + n];
+
                     Color color = calculateColorFromWeight(minWeight, maxWeight, w);
 
-                    // Draw Thick White Background Line
-                    if (previousPositions.size() > n - 1) {
-                        Vector prev = previousPositions.get(n - 1);
+                    Vector prev = previousPositions.get(n - 1);
 
-                        gc.setStroke(Color.WHITE);
-                        gc.setLineWidth(scale * 0.7);
-                        gc.strokeLine(prev.x(), prev.y(), curPos.x(), curPos.y());
+                    gc.setStroke(Color.WHITE);
+                    gc.setLineWidth(scale * 0.7);
+                    gc.strokeLine(prev.x(), prev.y(), curPos.x(), curPos.y());
 
-                        // Draw Thin Colored Line
-                        gc.setStroke(color);
-                        gc.setLineWidth(1.0);
-                        gc.strokeLine(prev.x(), prev.y(), curPos.x(), curPos.y());
-                    }
+                    gc.setStroke(color);
+                    gc.setLineWidth(1.0);
+                    gc.strokeLine(prev.x(), prev.y(), curPos.x(), curPos.y());
                 }
 
-                // Draw Node Circle (Color based on Bias)
-                float bias = weights[j][0];
+                // Draw Node Circle (Color based on Bias, which is at neuronStartIndex)
+                float bias = weights[neuronStartIndex];
                 Color nodeColor = calculateColorFromWeight(minWeight, maxWeight, bias);
 
                 double r = 2 * scale;

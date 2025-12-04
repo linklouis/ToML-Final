@@ -1,135 +1,134 @@
 package toml_final;
 
 import org.jetbrains.annotations.NotNull;
-
 import java.io.Serializable;
+import java.util.Arrays;
 
 public class Layer implements Serializable {
-    // Weights structure: [Neuron Index][Input Index + 1]
-    // weights[i][0] = Bias for neuron i
-    // weights[i][1...n] = Weights for inputs
-    private final float[][] weights;
+    // FLATTENED ARRAY: [Bias0, W0_0, W0_1... Bias1, W1_0, W1_1...]
+    private final float[] weights;
+    private final int numNeurons;
+    private final int numInputs; // The number of inputs from previous layer
+    private final int stride;    // numInputs + 1 (Bias + Weights)
+
     private Layer next = null;
     private final ActivationFunction activationFunction;
+    private final float[] outputCache;
 
     public Layer(int size, int prevSize, ActivationFunction activationFunction) {
-        // +1 to accommodate the bias column
-        weights = new float[size][prevSize + 1];
-        populateWeights();
+        this.numNeurons = size;
+        this.numInputs = prevSize;
+        this.stride = prevSize + 1;
+        this.weights = new float[numNeurons * stride];
         this.activationFunction = activationFunction;
+
+        // NEW: Initialize cache
+        this.outputCache = new float[numNeurons];
+
+        populateWeights();
     }
 
-    // Used by newLayer
-    private Layer(int size, int prevSize, ActivationFunction activationFunction, Layer next) {
-        // This needs to be prevSize + 1 as well to hold the bias
-        weights = new float[size][prevSize + 1];
-        populateWeights();
+    // Update ALL other constructors to initialize outputCache = new float[numNeurons];
+    // For example, the private constructor used by randCopy/child:
+    private Layer(float[] weights, int numNeurons, int numInputs, ActivationFunction activationFunction, Layer next) {
+        this.weights = weights;
+        this.numNeurons = numNeurons;
+        this.numInputs = numInputs;
+        this.stride = numInputs + 1;
         this.activationFunction = activationFunction;
         this.next = next;
+
+        // NEW: Initialize cache here too
+        this.outputCache = new float[numNeurons];
     }
 
-    // Used by child/copy
-    private Layer(float[][] weights, ActivationFunction activationFunction, Layer next) {
-        this.weights = weights;
-        this.activationFunction = activationFunction;
-        this.next = next;
-    }
+    public float[] pass(float @NotNull [] inputs) {
+        // REMOVED: float[] output = new float[numNeurons];
 
-    private Layer(float[][] weights, ActivationFunction activationFunction) {
-        this.weights = weights;
-        this.activationFunction = activationFunction;
+        int idx = 0;
+        for (int i = 0; i < numNeurons; i++) {
+            float sum = weights[idx++];
+            for (int j = 0; j < inputs.length; j++) {
+                sum += inputs[j] * weights[idx++];
+            }
+            // Write to cache instead of new array
+            outputCache[i] = activationFunction.apply(sum);
+        }
+
+        if (next == null) {
+            return outputCache;
+        }
+        return next.pass(outputCache);
     }
 
     private void populateWeights() {
         for (int i = 0; i < weights.length; i++) {
-            for (int j = 0; j < weights[i].length; j++) {
-                weights[i][j] = (float) (Math.random() * 2 - 1);
-            }
+            weights[i] = (float) (Math.random() * 2 - 1);
         }
     }
 
-    public float[] pass(float @NotNull [] inputs) {
-//        if (inputs.length != numIns()) {
-//            throw new IllegalArgumentException("Cannot pass float array of length "
-//                    + inputs.length + " to Layer accepting " + numIns() + " inputs.");
-//        }
+    // --- GENETIC ALGORITHM METHODS ---
 
-        float[] output = new float[size()];
+    public Layer randCopy() {
+        // 1. Allocate space (don't copy values)
+        float[] newWeights = new float[weights.length];
 
-        for (int i = 0; i < size(); i++) {
-            output[i] = weights[i][0];
+        // 2. Populate with NEW random values
+        for (int i = 0; i < newWeights.length; i++) {
+            newWeights[i] = (float) (Math.random() * 2 - 1);
+        }
 
-            for (int j = 0; j < inputs.length; j++) {
-                // Input index j matches Weight index j + 1
-                output[i] += inputs[j] * weights[i][j + 1]; // THIS IS THE TIME SPENDER
+        // 3. Recursion
+        if (next == null) {
+            // Use the private constructor you already have
+            return new Layer(newWeights, numNeurons, numInputs, activationFunction, null);
+        }
+        return new Layer(newWeights, numNeurons, numInputs, activationFunction, next.randCopy());
+    }
+
+    public Layer child(double mutationChance, double mutationSize) {
+        // CRITICAL FIX: Allocate NEW memory
+        float[] childWeights = new float[weights.length];
+
+        // Copy and Mutate in one pass
+        for (int i = 0; i < weights.length; i++) {
+            float val = weights[i];
+            if (Math.random() < mutationChance) {
+                val += (float) ((Math.random() * 2 - 1) * mutationSize);
             }
-            output[i] = activationFunction.apply(output[i]);
+            childWeights[i] = val;
         }
 
         if (next == null) {
-            return output;
+            return new Layer(childWeights, numNeurons, numInputs, activationFunction, null);
         }
-        return next.pass(output);
+        return new Layer(childWeights, numNeurons, numInputs, activationFunction, next.child(mutationChance, mutationSize));
     }
+
+    // --- STRUCTURE HELPERS ---
 
     public void newLayer(int size) {
-        if (next == null) {
-            next = new Layer(size, size(), this.activationFunction);
-        } else {
-            next.newLayer(size);
-        }
+        newLayer(size, ActivationFunction.ReLU());
     }
 
     public void newLayer(int size, ActivationFunction activationFunction) {
         if (next == null) {
-            next = new Layer(size, size(), activationFunction);
+            next = new Layer(size, numNeurons, activationFunction);
         } else {
             next.newLayer(size, activationFunction);
         }
     }
 
-    public Layer randCopy() {
-        if (next == null) {
-            return new Layer(size(), numIns(), activationFunction);
-        }
-        return new Layer(size(), numIns(), activationFunction, next.randCopy());
-    }
+    // --- GETTERS ---
 
-    public Layer child(double mutationChance, double mutationSize) {
-        float[][] newWeights = new float[size()][weights[0].length];
+    public int size() { return numNeurons; }
 
-        for (int i = 0; i < newWeights.length; i++) {
-            for (int j = 0; j < newWeights[i].length; j++) {
-                newWeights[i][j] = weights[i][j];
-                if (Math.random() < mutationChance) {
-                    newWeights[i][j] += (float) ((Math.random() * 2 - 1) * mutationSize);
-                }
-            }
-        }
-        if (next == null) {
-            return new Layer(newWeights, activationFunction);
-        }
-        return new Layer(newWeights, activationFunction, next.child(mutationChance, mutationSize));
-    }
+    public int numIns() { return numInputs; }
 
-    public int size() {
-        return weights.length;
-    }
+    // Helper for Renderer
+    public int getStride() { return stride; }
 
-    public int numIns() {
-        if (weights.length == 0) return 0;
-        return weights[0].length - 1;
-    }
+    public float[] getWeights() { return weights; } // Returns 1D array
 
-    public float[][] getWeights() {
-        return weights;
-    }
-
-    public Layer getNext() {
-        return next;
-    }
-
-    public boolean hasNext() {
-        return getNext() != null;
-    }
+    public Layer getNext() { return next; }
 }

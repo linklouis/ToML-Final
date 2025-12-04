@@ -57,17 +57,23 @@ public class Generation {
     private @NotNull Agent randomCrossover(Agent @NotNull [] best, @NotNull Random rand) {
         Agent child1 = best[rand.nextInt(best.length)].generateChild(mutationChance, mutationRate);
         Agent child2 = best[rand.nextInt(best.length)].generateChild(mutationChance, mutationRate);
+
         Layer curLayer1 = child1.getNetwork().getInputLayer();
         Layer curLayer2 = child2.getNetwork().getInputLayer();
-        while (curLayer1.hasNext() && curLayer2.hasNext()) {
-            float[][] weights1 = curLayer1.getWeights();
-            float[][] weights2 = curLayer2.getWeights();
-            for (int i = 0; i < weights1.length; i++) {
-                if (rand.nextBoolean()) {
-                    System.arraycopy(weights2[i], 0, weights1[i], 0, weights1[i].length);
-                }
+
+        while (curLayer1 != null && curLayer2 != null) {
+            float[] weights1 = curLayer1.getWeights();
+            float[] weights2 = curLayer2.getWeights();
+
+            // Since it's a 1D array, we can just split it by some arbitrary point
+            // Or pick random chunks. Here is a simple "Split in half" crossover for 1D arrays:
+            if (rand.nextBoolean()) {
+                // Take the second half of weights from parent 2
+                int splitPoint = weights1.length / 2;
+                System.arraycopy(weights2, splitPoint, weights1, splitPoint, weights1.length - splitPoint);
             }
-            curLayer1 =  curLayer1.getNext();
+
+            curLayer1 = curLayer1.getNext();
             curLayer2 = curLayer2.getNext();
         }
         return child1;
