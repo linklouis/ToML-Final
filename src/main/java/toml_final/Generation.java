@@ -84,6 +84,10 @@ public class Generation {
         return Arrays.copyOfRange(agents, 0, numToKeep);
     }
 
+    /**
+     * Replaces all of the agents in this generation with children of one parent.
+     * @param parent
+     */
     public void baseOn(NeuralNetwork parent) {
         Agent parentAgent = new Agent(parent);
 

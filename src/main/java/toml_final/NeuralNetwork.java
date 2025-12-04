@@ -1,5 +1,6 @@
 package toml_final;
 
+import javafx.scene.paint.Color;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
@@ -37,8 +38,6 @@ public class NeuralNetwork implements Serializable {
         return inputLayer.pass(inputs);
     }
 
-    // --- Add this to NeuralNetwork.java ---
-
     public void display(javafx.scene.canvas.GraphicsContext gc, double width, double height) {
         // 1. Flatten the linked list into a generic list for easier iteration
         java.util.List<Layer> layers = new java.util.ArrayList<>();
@@ -67,8 +66,7 @@ public class NeuralNetwork implements Serializable {
 
         // 3. Setup Scaling
         double scale = Math.min(width, height) / 200;
-        // Python: (screen_width - 20) / len(network)
-        double layerDist = (width - 20) / (layers.size() > 0 ? layers.size() : 1);
+        double layerDist = (width - 20) / (layers.isEmpty() ? 1 : layers.size());
 
         // 4. Draw Input Nodes
         java.util.List<Vector> previousPositions = new java.util.ArrayList<>();
@@ -89,8 +87,7 @@ public class NeuralNetwork implements Serializable {
             previousPositions.add(pos);
 
             // Draw Input Circle (White)
-            gc.setFill(javafx.scene.paint.Color.WHITE);
-            // Python radius 2.5 * scale and 3 * scale - 1. We'll average to 3*scale.
+            gc.setFill(Color.WHITE);
             double r = 2 * scale;
             gc.fillOval(pos.x() - r, pos.y() - r, r * 2, r * 2);
         }
@@ -122,24 +119,17 @@ public class NeuralNetwork implements Serializable {
                     float w = weights[j][n];
 
                     // Determine Color
-                    javafx.scene.paint.Color color;
-                    if (w > 0) {
-                        double intensity = 255 * w / Math.abs(maxWeight);
-                        color = javafx.scene.paint.Color.rgb(0, (int)Math.min(255, intensity), 0);
-                    } else {
-                        double intensity = (minWeight != 0) ? (255 * -w / Math.abs(minWeight)) : (255 * -w);
-                        color = javafx.scene.paint.Color.rgb((int)Math.min(255, intensity), 0, 0);
-                    }
+                    Color color = calculateColorFromWeight(minWeight, maxWeight, w);
 
-                    // Draw Thick White Background Line (mimics Pygame .line)
+                    // Draw Thick White Background Line
                     if (previousPositions.size() > n - 1) {
                         Vector prev = previousPositions.get(n - 1);
 
-                        gc.setStroke(javafx.scene.paint.Color.WHITE);
+                        gc.setStroke(Color.WHITE);
                         gc.setLineWidth(scale * 0.7);
                         gc.strokeLine(prev.x(), prev.y(), curPos.x(), curPos.y());
 
-                        // Draw Thin Colored Line (mimics Pygame .aaline)
+                        // Draw Thin Colored Line
                         gc.setStroke(color);
                         gc.setLineWidth(1.0);
                         gc.strokeLine(prev.x(), prev.y(), curPos.x(), curPos.y());
@@ -148,21 +138,13 @@ public class NeuralNetwork implements Serializable {
 
                 // Draw Node Circle (Color based on Bias)
                 float bias = weights[j][0];
-                javafx.scene.paint.Color nodeColor;
-                if (bias > 0) {
-                    double intensity = 255 * bias / Math.abs(maxWeight);
-                    nodeColor = javafx.scene.paint.Color.rgb(0, (int)Math.min(255, intensity), 0);
-                } else {
-                    double intensity = (minWeight != 0) ? (255 * -bias / Math.abs(minWeight)) : (255 * -bias);
-                    nodeColor = javafx.scene.paint.Color.rgb((int)Math.min(255, intensity), 0, 0);
-                }
+                Color nodeColor = calculateColorFromWeight(minWeight, maxWeight, bias);
 
                 double r = 2 * scale;
                 gc.setFill(nodeColor);
                 gc.fillOval(curPos.x() - r, curPos.y() - r, r * 2, r * 2);
 
-                // Add optional white outline if desired to match Pygame's circle stacking
-                gc.setStroke(javafx.scene.paint.Color.WHITE);
+                gc.setStroke(Color.WHITE);
                 gc.setLineWidth(0.5);
                 gc.strokeOval(curPos.x() - r, curPos.y() - r, r * 2, r * 2);
 
@@ -170,6 +152,18 @@ public class NeuralNetwork implements Serializable {
             }
             previousPositions = nodePositions;
         }
+    }
+
+    private @NotNull Color calculateColorFromWeight(float minWeight, float maxWeight, float weight) {
+        Color color;
+        if (weight > 0) {
+            double intensity = 255 * weight / Math.abs(maxWeight);
+            color = Color.rgb(0, (int)Math.min(255, intensity), 0);
+        } else {
+            double intensity = (minWeight != 0) ? (255 * -weight / Math.abs(minWeight)) : (255 * -weight);
+            color = Color.rgb((int)Math.min(255, intensity), 0, 0);
+        }
+        return color;
     }
 
     public NeuralNetwork child(double mutationChance, double mutationSize) {

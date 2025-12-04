@@ -13,7 +13,7 @@ public class Layer implements Serializable {
     private ActivationFunction activationFunction;
 
     public Layer(int size, int prevSize, ActivationFunction activationFunction) {
-        // FIX: +1 to accommodate the bias column
+        // +1 to accommodate the bias column
         weights = new float[size][prevSize + 1];
         populateWeights();
         this.activationFunction = activationFunction;
@@ -21,7 +21,7 @@ public class Layer implements Serializable {
 
     // Used by newLayer
     private Layer(int size, int prevSize, ActivationFunction activationFunction, Layer next) {
-        // FIX: This needs to be prevSize + 1 as well to hold the bias
+        // This needs to be prevSize + 1 as well to hold the bias
         weights = new float[size][prevSize + 1];
         populateWeights();
         this.activationFunction = activationFunction;
@@ -57,10 +57,8 @@ public class Layer implements Serializable {
         float[] output = new float[size()];
 
         for (int i = 0; i < size(); i++) {
-            // FIX: Apply Bias first (Index 0)
             output[i] = weights[i][0];
 
-            // FIX: Loop strictly over the input length
             for (int j = 0; j < inputs.length; j++) {
                 // Input index j matches Weight index j + 1
                 output[i] += inputs[j] * weights[i][j + 1];
@@ -78,7 +76,6 @@ public class Layer implements Serializable {
         if (next == null) {
             next = new Layer(size, size(), this.activationFunction);
         } else {
-            // FIX: Call next.newLayer, not next.next.newLayer (avoids NullPointer)
             next.newLayer(size);
         }
     }
@@ -87,13 +84,11 @@ public class Layer implements Serializable {
         if (next == null) {
             next = new Layer(size, size(), activationFunction);
         } else {
-            // FIX: Recursion fix here as well
             next.newLayer(size, activationFunction);
         }
     }
 
     public Layer randCopy() {
-        // Note: You might want to copy 'this.activationFunction' instead of hardcoding ReLU
         if (next == null) {
             return new Layer(size(), numIns(), activationFunction);
         }
