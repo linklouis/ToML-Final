@@ -31,10 +31,10 @@ public class NeuralNetwork implements Serializable {
     }
 
     public float[] predict(float @NotNull [] inputs) {
-        if (inputs.length != numInputs) {
-            throw new IllegalArgumentException("Network with " + numInputs
-                    + " inputs cannot accept input array of size " + inputs.length + ".");
-        }
+//        if (inputs.length != numInputs) {
+//            throw new IllegalArgumentException("Network with " + numInputs
+//                    + " inputs cannot accept input array of size " + inputs.length + ".");
+//        }
         return inputLayer.pass(inputs);
     }
 

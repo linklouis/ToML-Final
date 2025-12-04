@@ -49,10 +49,10 @@ public class Layer implements Serializable {
     }
 
     public float[] pass(float @NotNull [] inputs) {
-        if (inputs.length != numIns()) {
-            throw new IllegalArgumentException("Cannot pass float array of length "
-                    + inputs.length + " to Layer accepting " + numIns() + " inputs.");
-        }
+//        if (inputs.length != numIns()) {
+//            throw new IllegalArgumentException("Cannot pass float array of length "
+//                    + inputs.length + " to Layer accepting " + numIns() + " inputs.");
+//        }
 
         float[] output = new float[size()];
 
@@ -61,7 +61,7 @@ public class Layer implements Serializable {
 
             for (int j = 0; j < inputs.length; j++) {
                 // Input index j matches Weight index j + 1
-                output[i] += inputs[j] * weights[i][j + 1];
+                output[i] += inputs[j] * weights[i][j + 1]; // THIS IS THE TIME SPENDER
             }
             output[i] = activationFunction.apply(output[i]);
         }

@@ -69,66 +69,185 @@ public class Player extends GameObj{
 
     }
 
-    public float[] getInputs(Platform[] obstacles, Vector goalPos) {
-        Vector origin = this.head();
+    // --- OPTIMIZATION 1: Static Lookup Tables ---
+// Place these at the top of your Player class with other constants
+    private static final float[] RAY_COS = new float[20];
+    private static final float[] RAY_SIN = new float[20];
 
-        int numRays = 20;
-        float[] inputs = new float[(numRays * 3) + 7]; // 3 inputs per ray + 7 state inputs
+    static {
+        // Pre-calculate 20 ray angles once at startup
+        for (int i = 0; i < 20; i++) {
+            double angle = (2 * Math.PI / 20) * i;
+            RAY_COS[i] = (float) Math.cos(angle);
+            RAY_SIN[i] = (float) Math.sin(angle);
+        }
+    }
+
+    // --- OPTIMIZATION 2: Reusable Memory ---
+// Add this as a field in Player.java to stop creating garbage every frame
+    private final float[] cachedInputs = new float[(20 * 3) + 7];
+
+    /**
+     * Optimized Zero-Allocation getInputs.
+     * Uses primitive math only - no 'new Vector()' or object creation inside.
+     */
+    public float[] getInputs(Platform[] obstacles, Vector goalPos) {
+        // 1. Setup Origins (Head position)
+        // Accessing pos.x() directly if possible, or via getter
+        double ox = this.pos.x() + this.dim.x() / 2;
+        double oy = this.pos.y();
+
         int index = 0;
 
-        // --- 1. Raycast Inputs ---
-        for (int i = 0; i < numRays; i++) {
-            double angle = (2 * Math.PI / numRays) * i;
-            Vector direction = new Vector(Math.cos(angle), Math.sin(angle));
+        // 2. Raycast Loop (Unrolled logic)
+        for (int i = 0; i < 20; i++) {
+            double dirX = RAY_COS[i];
+            double dirY = RAY_SIN[i];
 
-            RayHit hit = castRay(origin, direction, obstacles);
+            // "Closest Hit" variables
+            double closestDist = MAX_RAY_DISTANCE;
+            Platform closestObj = null;
+            boolean closestIsVertical = false;
 
-            // Input A: Normalized Distance
-            inputs[index++] = normalizeDistance(hit.distance);
+            // Check every obstacle
+            for (Platform obs : obstacles) {
+                // Accessing fields directly (obs.pos is protected in same package) is faster
+                // if you can't access .pos directly, use .getPos()
+                double rx = obs.getPos().x();
+                double ry = obs.getPos().y();
+                double rw = obs.getDim().x();
+                double rh = obs.getDim().y();
 
-            // Input B: Orientation
-            if (hit.object != null) {
-                // 1.0 for Wall, 0.5 for Floor/Ceiling
-                inputs[index++] = hit.isVertical ? 1.0f : 0.5f;
+                // --- INLINED SLAB INTERSECTION ALGORITHM ---
+                // This replaces 'getRayIntersection' and 'new Vector'
+                double tMin = -1e9, tMax = 1e9;
+                double t1, t2;
 
-                // Input C: Danger
-                boolean isDangerous = hit.object.getType() == Platform.Type.KILL;
-                inputs[index++] = isDangerous ? 1.0f : 0.0f;
+                // X Slab
+                if (Math.abs(dirX) < 1e-9) {
+                    if (ox < rx || ox > rx + rw) {
+                        tMin = 1; tMax = -1; // Force invalid
+                    }
+                } else {
+                    t1 = (rx - ox) / dirX;
+                    t2 = ((rx + rw) - ox) / dirX;
+                    tMin = Math.min(t1, t2);
+                    tMax = Math.max(t1, t2);
+                }
+
+                // Y Slab (Only check if X didn't already miss)
+                if (tMin <= tMax) {
+                    if (Math.abs(dirY) < 1e-9) {
+                        if (oy < ry || oy > ry + rh) {
+                            tMin = 1; tMax = -1; // Force invalid
+                        }
+                    } else {
+                        t1 = (ry - oy) / dirY;
+                        t2 = ((ry + rh) - oy) / dirY;
+                        tMin = Math.max(tMin, Math.min(t1, t2));
+                        tMax = Math.min(tMax, Math.max(t1, t2));
+                    }
+                }
+
+                // Did we hit?
+                if (tMax >= tMin && tMax > 0) {
+                    double dist = (tMin < 0) ? tMax : tMin;
+
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        closestObj = obs;
+                        // Determine normal (Vertical if X-slab was the entry point)
+                        // Simplified check: If we hit the X plane roughly at tMin...
+                        // A precise check re-calculates tMinX, but usually,
+                        // we can infer it or just stick to the closestDist logic.
+                        // For perfect accuracy matching your old code:
+                        double tMinX = (Math.abs(dirX) > 1e-9) ?
+                                Math.min((rx - ox) / dirX, ((rx + rw) - ox) / dirX) : -1e9;
+                        // If our final tMin came from X, it's vertical
+                        closestIsVertical = (Math.abs(tMin - tMinX) < 1e-5);
+                    }
+                }
+            } // End Obstacle Loop
+
+            // --- FILL INPUTS ---
+            cachedInputs[index++] = normalizeDistance(closestDist);
+
+            if (closestObj != null) {
+                cachedInputs[index++] = closestIsVertical ? 1.0f : 0.5f;
+                boolean isDangerous = closestObj.getType() == Platform.Type.KILL;
+                cachedInputs[index++] = isDangerous ? 1.0f : 0.0f;
             } else {
-                inputs[index++] = normalizeDistance(MAX_RAY_DISTANCE);
-                inputs[index++] = 0.0f; // Safe
+                // No hit logic
+                cachedInputs[index++] = normalizeDistance(MAX_RAY_DISTANCE);
+                cachedInputs[index++] = 0.0f;
             }
         }
 
-        // --- 2. Line of Sight to Goal ---
-        Vector vecToGoal = goalPos.subtract(origin);
-        double distToGoal = vecToGoal.magnitude();
-        Vector dirToGoal = vecToGoal.normalize();
+        // 3. Goal & Line of Sight Calculation (Primitive Math)
+        double gx = goalPos.x() - ox;
+        double gy = goalPos.y() - oy;
+        double distToGoal = Math.sqrt(gx*gx + gy*gy);
 
-        RayHit losHit = castRay(origin, dirToGoal, obstacles);
+        // Avoid divide by zero
+        double dirToGoalX = (distToGoal > 0) ? gx / distToGoal : 0;
+        double dirToGoalY = (distToGoal > 0) ? gy / distToGoal : 0;
 
-        // If we hit something and that thing is closer than the goal, view is blocked
+        // Line of Sight Raycast (Single Ray)
+        double losDist = MAX_RAY_DISTANCE;
+        Platform losObj = null;
+
+        for (Platform obs : obstacles) {
+            double rx = obs.getPos().x(); double ry = obs.getPos().y();
+            double rw = obs.getDim().x(); double rh = obs.getDim().y();
+
+            double tMin = -1e9, tMax = 1e9;
+            double t1, t2;
+
+            if (Math.abs(dirToGoalX) < 1e-9) {
+                if (ox < rx || ox > rx + rw) { tMin = 1; tMax = -1; }
+            } else {
+                t1 = (rx - ox) / dirToGoalX;
+                t2 = ((rx + rw) - ox) / dirToGoalX;
+                tMin = Math.min(t1, t2);
+                tMax = Math.max(t1, t2);
+            }
+
+            if (tMin <= tMax) {
+                if (Math.abs(dirToGoalY) < 1e-9) {
+                    if (oy < ry || oy > ry + rh) { tMin = 1; tMax = -1; }
+                } else {
+                    t1 = (ry - oy) / dirToGoalY;
+                    t2 = ((ry + rh) - oy) / dirToGoalY;
+                    tMin = Math.max(tMin, Math.min(t1, t2));
+                    tMax = Math.min(tMax, Math.max(t1, t2));
+                }
+            }
+
+            if (tMax >= tMin && tMax > 0) {
+                double d = (tMin < 0) ? tMax : tMin;
+                if (d < losDist) {
+                    losDist = d;
+                    losObj = obs;
+                }
+            }
+        }
+
+        // LOS Logic
         double lineOfSight = 1.0;
-        if (losHit.distance < distToGoal && losHit.object != null && losHit.object.getType() != Platform.Type.KILL) {
+        if (losDist < distToGoal && losObj != null && losObj.getType() != Platform.Type.KILL) {
             lineOfSight = -1.0;
         }
 
-        // --- 3. State Inputs ---
-        // Clamp values similar to np.clip
-        inputs[index++] = (float) Math.clamp(this.vel.x() / MAX_MOVE_SPEED, -1, 1);
-        inputs[index++] = (float) Math.clamp(this.vel.y() / JUMP_STRENGTH, -1, 1);
-        inputs[index++] = isOnGround ? 1.0f : 0.0f;
+        // 4. State Inputs
+        cachedInputs[index++] = (float) Math.clamp(this.vel.x() / MAX_MOVE_SPEED, -1, 1);
+        cachedInputs[index++] = (float) Math.clamp(this.vel.y() / JUMP_STRENGTH, -1, 1);
+        cachedInputs[index++] = isOnGround ? 1.0f : 0.0f;
+        cachedInputs[index++] = (float) dirToGoalX;
+        cachedInputs[index++] = (float) dirToGoalY;
+        cachedInputs[index++] = normalizeDistance(distToGoal);
+        cachedInputs[index++] = (float) lineOfSight;
 
-        // Normalized vector to goal
-        inputs[index++] = (float) dirToGoal.x();
-        inputs[index++] = (float) dirToGoal.y();
-
-        // Normalized distance to goal (using the ref value from your python code)
-        inputs[index++] = normalizeDistance(distToGoal);
-
-        inputs[index++] = (float) lineOfSight;
-
-        return inputs;
+        return cachedInputs;
     }
 
 
