@@ -205,10 +205,7 @@ public class Main extends Application {
 
                 // Throttling for Visual Mode
                 if (!headlessMode) {
-                    try { Thread.sleep(16); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-                } else {
-                    // Tiny yield to prevent UI starvation during massive throughput
-                    try { Thread.sleep(1); } catch (Exception ignored) {}
+                    try { Thread.sleep(8); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
                 }
             }
 
@@ -221,7 +218,7 @@ public class Main extends Application {
      * Helper to run ANY operation on all players using our Physics Thread Pool.
      * Replaces parallelStream() to avoid CommonPool thrashing.
      */
-    private void runParallelTask(List<Player> allPlayers, Consumer<Player> action) {
+    private void runParallelTask(@NotNull List<Player> allPlayers, Consumer<Player> action) {
         int totalAgents = allPlayers.size();
         int batchSize = (totalAgents + numThreads - 1) / numThreads;
         reusableTaskList.clear();
@@ -247,6 +244,7 @@ public class Main extends Application {
         }
     }
 
+
     private void runAgentBatch(@NotNull List<Player> batch, @NotNull Level level, int startStep, int endStep) {
         toml_final.Platform[] obstacles = level.getPlatforms();
         Vector goal = level.getGoal();
@@ -261,19 +259,31 @@ public class Main extends Application {
             if (!p.isAlive()) continue;
 
             for (int step = startStep; step < endStep; step++) {
+
+                // 1. Kill Zone Check (UPDATED TO USE PRIMITIVES)
                 if (step > TIME_BEFORE_KILL_ZONE) {
-                    if (p.getPos().x() < kzMaxX && (p.getPos().x() + p.getDim().x()) > kzMinX &&
-                            p.getPos().y() < kzMaxY && (p.getPos().y() + p.getDim().y()) > kzMinY) {
+                    // WAS: if (p.getPos().x() < kzMaxX ...)
+                    // NOW: Uses p.getX() - Zero Allocation
+                    if (p.getX() < kzMaxX &&
+                            (p.getX() + p.getWidth()) > kzMinX &&
+                            p.getY() < kzMaxY &&
+                            (p.getY() + p.getHeight()) > kzMinY) {
+
                         p.die();
                         p.getBrain().changeScore(20);
                         break;
                     }
                 }
 
+                // 2. Physics Update
                 p.update(obstacles, goal);
 
-                double dx = goalX - (p.getPos().x() + p.getDim().x() / 2);
-                double dy = goalY - (p.getPos().y() + p.getDim().y() / 2);
+                // 3. Goal Check (UPDATED TO USE PRIMITIVES)
+                // WAS: double dx = goalX - (p.getPos().x() + ...
+                // NOW: Uses p.getX()
+                double dx = goalX - (p.getX() + p.getWidth() / 2);
+                double dy = goalY - (p.getY() + p.getHeight() / 2);
+
                 if (dx * dx + dy * dy <= 100) {
                     p.die();
                     p.changeLevelScore(300);
@@ -348,8 +358,8 @@ public class Main extends Application {
             bestPlayer.getBrain().getNetwork().display(netGc, networkCanvas.getWidth(), networkCanvas.getHeight());
             gc.setStroke(Color.CYAN);
             gc.setLineWidth(2);
-            gc.strokeRect(bestPlayer.getPos().x() - 2, bestPlayer.getPos().y() - 2,
-                    bestPlayer.getDim().x() + 4, bestPlayer.getDim().y() + 4);
+            gc.strokeRect(bestPlayer.getX() - 2, bestPlayer.getY() - 2,
+                    bestPlayer.getWidth() + 4, bestPlayer.getHeight() + 4);
         }
     }
 

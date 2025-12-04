@@ -49,7 +49,7 @@ public class Layer implements Serializable {
         for (int i = 0; i < numNeurons; i++) {
             float sum = weights[idx++];
             for (int j = 0; j < inputs.length; j++) {
-                sum += inputs[j] * weights[idx++];
+                sum += inputs[j] * weights[idx++]; // THIS LINE
             }
             // Write to cache instead of new array
             outputCache[i] = activationFunction.apply(sum);

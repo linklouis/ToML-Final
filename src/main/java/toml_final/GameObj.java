@@ -47,6 +47,10 @@ public class GameObj {
         this.color = color;
     }
 
+    public Color getColor() {
+        return color;
+    }
+
     public Vector getPos() {
         return pos;
     }

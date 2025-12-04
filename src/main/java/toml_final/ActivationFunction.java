@@ -10,7 +10,7 @@ public interface ActivationFunction extends Serializable {
 
     @Contract(pure = true)
     static @NotNull ActivationFunction negativeInclusiveSigmoid() {
-        return n -> (float) (2/(1 + Math.pow(Math.E, -n)) - 1);
+        return n -> (float) (2/(1 + Math.exp(-n)) - 1);
     }
 
     @Contract(pure = true)
