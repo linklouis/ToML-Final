@@ -24,7 +24,7 @@ public class Main extends Application {
     private static final int WIDTH = 600;
     private static final int HEIGHT = 400;
     private static final int INFO_PANE_HEIGHT = 15;
-    private static final int UPDATES_PER_THREAD = 40;
+    private static final int UPDATES_PER_THREAD = 50;
     private static final int NUM_FRAMES_TO_TRACK = 30;
     private static final boolean FROM_FILE = false;
     private static final boolean REAL_TIME_MODE = false;

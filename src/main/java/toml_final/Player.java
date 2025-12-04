@@ -65,7 +65,7 @@ public class Player extends GameObj{
 
     private float normalizeDistance(double distance) {
 //        return (float) (2/(1 + Math.exp(-distance/100)) - 1);
-        return (float) (4/(1 + Math.exp(-distance/120)) - 3);
+        return (float) -(4/(1 + Math.exp(-distance/120)) - 3);
 
     }
 
@@ -151,6 +151,7 @@ public class Player extends GameObj{
         vel = new Vector(0, 9.8);
         minDistToGoal = Double.MAX_VALUE;
         touched_platforms.clear();
+        levelScore = 0;
     }
 
     public void jump(double jumpStrength) {
