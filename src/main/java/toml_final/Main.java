@@ -102,7 +102,7 @@ public class Main extends Application {
         stage.setScene(scene);
         stage.show();
 
-        stage.setOnCloseRequest(e -> {
+        stage.setOnCloseRequest(_ -> {
             running = false;
             physicsExecutor.shutdownNow();
             System.exit(0);
@@ -131,7 +131,7 @@ public class Main extends Application {
 
     private void initSimulation() {
         NeuralNetwork template = new NeuralNetwork(NUM_INPUTS);
-        template.newLayer(NUM_INPUTS, ActivationFunction.outputLimitedLeakyReLU());
+        template.newLayer(NUM_INPUTS*4/3, ActivationFunction.outputLimitedLeakyReLU());
         template.newLayer(2, n -> ActivationFunction.negativeInclusiveSigmoid().apply((float) (n * 1.4)));
 
         generation = new Generation(template, NUM_AGENTS, (int) (NUM_AGENTS*KEEP_RATE), MUTATION_CHANCE, MUTATION_SIZE);
@@ -198,6 +198,7 @@ public class Main extends Application {
                 try {
                     physicsExecutor.invokeAll(reusableTaskList);
                 } catch (InterruptedException e) {
+                    System.err.println("An issue occurred while invoking the task list in the physics loop.");
                     e.printStackTrace();
                 }
 
@@ -422,9 +423,6 @@ public class Main extends Application {
 
     private void createLevels() {
         levels = new ArrayList<>();
-        // ... (Your level creation code remains exactly the same) ...
-        // I omitted it here for brevity, paste your level creation code back in.
-        // COPY-PASTE YOUR CREATE LEVELS CODE HERE
 
         // Level 1
         toml_final.Platform[] l1_obs = {
@@ -526,42 +524,31 @@ public class Main extends Application {
 
 
         for (int i = 0; i < 2; i++) {
-            levels.add(l1);
-            levels.add(l1.getReversed(WIDTH));
+            addLevel(l1, false, false);
+            addLevel(l2, false, false);
+            addLevel(l3, false, true);
+            addLevel(l4, true, true);
+            addLevel(l4a, true, false);
+            addLevel(l4, true, false);
+            addLevel(l5, false, true);
+            addLevel(l6, true, true);
+        }
+    }
 
-            levels.add(l2);
-            levels.add(l2.getReversed(WIDTH));
-
-            levels.add(l3);
-            levels.add(l3.getReversed(WIDTH));
-            levels.add(l3.getRandGoal());
-            levels.add(l3.getReversed(WIDTH).getRandGoal());
-
-            levels.add(l4);
-            levels.add(l4.getReversed(WIDTH));
-            levels.add(l4.getAlt());
-            levels.add(l4.getReversed(WIDTH).getAlt());
-            levels.add(l4a);
-            levels.add(l4a.getReversed(WIDTH));
-            levels.add(l4a.getAlt());
-            levels.add(l4a.getReversed(WIDTH).getAlt());
-
-            levels.add(l4.getRandGoal());
-            levels.add(l4.getReversed(WIDTH).getRandGoal());
-            levels.add(l4.getAlt().getRandGoal());
-            levels.add(l4.getReversed(WIDTH).getAlt().getRandGoal());
-
-            levels.add(l5);
-            levels.add(l5.getReversed(WIDTH));
-            levels.add(l5.getRandGoal());
-            levels.add(l5.getReversed(WIDTH).getRandGoal());
-
-            levels.add(l6);
-            levels.add(l6.getReversed(WIDTH));
-            levels.add(l6.getAlt());
-            levels.add(l6.getReversed(WIDTH).getAlt());
-            levels.add(l6.getRandGoal());
-            levels.add(l6.getReversed(WIDTH).getRandGoal());
+    private void addLevel(Level level, boolean alt, boolean randomGoal) {
+        levels.add(level);
+        levels.add(level.getReversed(WIDTH));
+        if (alt){
+            levels.add(level.getAlt());
+            levels.add(level.getAlt().getReversed(WIDTH));
+            if (randomGoal){
+                levels.add(level.getAlt().getRandGoal());
+                levels.add(level.getAlt().getRandGoal().getReversed(WIDTH));
+            }
+        }
+        if (randomGoal){
+            levels.add(level.getRandGoal());
+            levels.add(level.getRandGoal().getReversed(WIDTH));
         }
     }
 
