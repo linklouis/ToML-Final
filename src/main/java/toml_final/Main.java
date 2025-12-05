@@ -36,7 +36,7 @@ public class Main extends Application {
     private static final int MAX_STEPS_PER_LEVEL = 1100;
     private static final int TIME_BEFORE_KILL_ZONE = 300;
     private static final int NUM_GENS = 10000000;
-    private static final int NUM_AGENTS = 5000;
+    private static final int NUM_AGENTS = 2000;
     private static final double KEEP_RATE = 0.3;
     private static final double MUTATION_CHANCE = 0.08;
     private static final double MUTATION_SIZE = 0.1;
@@ -131,7 +131,7 @@ public class Main extends Application {
 
     private void initSimulation() {
         NeuralNetwork template = new NeuralNetwork(NUM_INPUTS);
-        template.newLayer(NUM_INPUTS * 4 / 3, ActivationFunction.outputLimitedLeakyReLU());
+        template.newLayer(NUM_INPUTS, ActivationFunction.outputLimitedLeakyReLU());
         template.newLayer(2, n -> ActivationFunction.negativeInclusiveSigmoid().apply((float) (n * 1.4)));
 
         generation = new Generation(template, NUM_AGENTS, (int) (NUM_AGENTS*KEEP_RATE), MUTATION_CHANCE, MUTATION_SIZE);
@@ -528,10 +528,15 @@ public class Main extends Application {
         for (int i = 0; i < 2; i++) {
             levels.add(l1);
             levels.add(l1.getReversed(WIDTH));
+
             levels.add(l2);
             levels.add(l2.getReversed(WIDTH));
+
             levels.add(l3);
             levels.add(l3.getReversed(WIDTH));
+            levels.add(l3.getRandGoal());
+            levels.add(l3.getReversed(WIDTH).getRandGoal());
+
             levels.add(l4);
             levels.add(l4.getReversed(WIDTH));
             levels.add(l4.getAlt());
@@ -540,12 +545,23 @@ public class Main extends Application {
             levels.add(l4a.getReversed(WIDTH));
             levels.add(l4a.getAlt());
             levels.add(l4a.getReversed(WIDTH).getAlt());
+
+            levels.add(l4.getRandGoal());
+            levels.add(l4.getReversed(WIDTH).getRandGoal());
+            levels.add(l4.getAlt().getRandGoal());
+            levels.add(l4.getReversed(WIDTH).getAlt().getRandGoal());
+
             levels.add(l5);
             levels.add(l5.getReversed(WIDTH));
+            levels.add(l5.getRandGoal());
+            levels.add(l5.getReversed(WIDTH).getRandGoal());
+
             levels.add(l6);
             levels.add(l6.getReversed(WIDTH));
             levels.add(l6.getAlt());
             levels.add(l6.getReversed(WIDTH).getAlt());
+            levels.add(l6.getRandGoal());
+            levels.add(l6.getReversed(WIDTH).getRandGoal());
         }
     }
 

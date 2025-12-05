@@ -66,6 +66,11 @@ public class Level {
         return new Level(weight, platforms, goal, alternateSpawn, null, killZone);
     }
 
+    public Level getRandGoal() {
+        return new Level(weight, platforms, new Vector(Math.random() * 600, Math.random()*300), spawnPos, alternateSpawn, killZone);
+
+    }
+
     // --- Getters ---
     public Platform[] getPlatforms() { return platforms; }
     public Vector getGoal() { return goal; }
