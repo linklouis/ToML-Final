@@ -36,7 +36,7 @@ public class Main extends Application {
     private static final int MAX_STEPS_PER_LEVEL = 1100;
     private static final int TIME_BEFORE_KILL_ZONE = 300;
     private static final int NUM_GENS = 10000000;
-    private static final int NUM_AGENTS = 3000;
+    private static final int NUM_AGENTS = 5000;
     private static final double KEEP_RATE = 0.3;
     private static final double MUTATION_CHANCE = 0.08;
     private static final double MUTATION_SIZE = 0.1;
@@ -65,7 +65,7 @@ public class Main extends Application {
     private int stepOnPrevFrame = 0;
 
     // THREAD POOL
-    private final int numThreads = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
+    private final int numThreads = Math.max(1, Runtime.getRuntime().availableProcessors());
     private final ExecutorService physicsExecutor = Executors.newFixedThreadPool(numThreads);
     // Reuse this list for batch tasks to reduce allocation
     private final List<Callable<Void>> reusableTaskList = new ArrayList<>(numThreads);
@@ -281,7 +281,7 @@ public class Main extends Application {
                 // 3. Goal Check (UPDATED TO USE PRIMITIVES)
                 // WAS: double dx = goalX - (p.getPos().x() + ...
                 // NOW: Uses p.getX()
-                double dx = goalX - (p.getX() + p.getWidth() / 2);
+                double dx = (goalX - (p.getX() + p.getWidth() / 2))*0.8;
                 double dy = goalY - (p.getY() + p.getHeight() / 2);
 
                 if (dx * dx + dy * dy <= 100) {
@@ -308,7 +308,7 @@ public class Main extends Application {
         gc.setFill(Color.rgb(100, 100, 100, 0.4));
         gc.fillRect(kz.getMinX(), kz.getMinY(), kz.getWidth(), kz.getHeight());
         gc.setFill(Color.LIME);
-        gc.fillOval(level.getGoal().x(), level.getGoal().y(), 10, 10);
+        gc.fillOval(level.getGoal().x(), level.getGoal().y(), 20, 20);
         for (toml_final.Platform p : level.getPlatforms()) p.draw(gc);
 
         if (allPlayers != null) {
@@ -454,7 +454,7 @@ public class Main extends Application {
                 new toml_final.Platform(new Vector(350, 290), new Vector(50, 10), toml_final.Platform.Type.KILL),
                 new toml_final.Platform(new Vector(249, 210), new Vector(10, 200), toml_final.Platform.Type.STANDARD)
         };
-        Level l2 = new Level(4, l2_obs, new Vector(230, 190), new Vector(5, 322), new Vector(500, 322), new Rectangle2D(0, 0, 80, 400));
+        Level l2 = new Level(4, l2_obs, new Vector(20, 190), new Vector(5, 322), new Vector(500, 322), new Rectangle2D(0, 0, 80, 400));
 
         // Level 3: Vertical
         toml_final.Platform[] l3_obs = {
@@ -488,8 +488,8 @@ public class Main extends Application {
                 new toml_final.Platform(new Vector(500, 250), new Vector(50, 100), toml_final.Platform.Type.STANDARD),
                 new toml_final.Platform(new Vector(550, 349), new Vector(50, 10), toml_final.Platform.Type.KILL)
         };
-        Level l4 = new Level(1, l4_obs, new Vector(310, 170), new Vector(10, 323), new Vector(520, 220), new Rectangle2D(0, 0, 100, 400));
-        Level l4a = new Level(1, l4_obs, new Vector(310, 170), new Vector(230, 273), new Vector(410, 273), new Rectangle2D(0, 0, 100, 400));
+        Level l4 = new Level(1, l4_obs, new Vector(300, 170), new Vector(10, 323), new Vector(520, 220), new Rectangle2D(0, 0, 100, 400));
+        Level l4a = new Level(1, l4_obs, new Vector(300, 170), new Vector(230, 273), new Vector(410, 273), new Rectangle2D(0, 0, 100, 400));
 
         // Level 5: Right Jumps
         toml_final.Platform[] l5_obs = {

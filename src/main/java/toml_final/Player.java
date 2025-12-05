@@ -199,7 +199,7 @@ public class Player extends GameObj {
     public void jump(double jumpStrength) {
         this.vy = -JUMP_STRENGTH * jumpStrength;
         isOnGround = false;
-        changeLevelScore(-1/3.0 * jumpStrength);
+//        changeLevelScore(-1/3.0 * jumpStrength);
     }
 
     public void update(Platform[] obstacles, Vector goalPos) {

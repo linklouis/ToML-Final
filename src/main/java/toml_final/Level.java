@@ -9,7 +9,7 @@ public class Level {
     private final Vector spawnPos;
     private final Vector alternateSpawn;
     private final Rectangle2D killZone;
-    private double weight;
+    private final double weight;
 
     /**
      * @param alternateSpawn If null, defaults to spawnPos (same as Python implementation)
