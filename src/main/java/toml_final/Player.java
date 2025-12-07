@@ -59,7 +59,7 @@ public class Player extends GameObj {
     }
 
     private float normalizeDistance(double distance) {
-        return (float) -(4/(1 + Math.exp(-distance/120)) - 3);
+        return (float) -(4/(1 + Math.exp(-distance/120)) - 3);  // Closer platforms lead to bigger inputs
     }
 
     public float[] getInputs(Platform[] obstacles, Vector goalPos) {
@@ -260,7 +260,7 @@ public class Player extends GameObj {
                     isOnGround = true;
                     if (!touched_platforms.contains(obs) && obs.getDim().x() < 550) {
                         touched_platforms.add(obs);
-                        changeLevelScore(70);
+                        changeLevelScore(100);
                     }
                 } else {
                     this.py = obs.getPos().y() + obs.getDim().y();
@@ -304,7 +304,10 @@ public class Player extends GameObj {
     public double getMinDistToGoal() { return minDistToGoal; }
     public boolean isAlive() { return isAlive; }
     public void changeLevelScore(double change) { levelScore += change; }
-    public void updateScore(double levelWeight) { brain.changeScore(levelScore * levelWeight); }
+    public void updateScore(double levelWeight) {
+        brain.changeScore(levelScore * levelWeight);
+        levelScore = 0;
+    }
 
     // Primitive Accessors
     public double getX() { return px; }

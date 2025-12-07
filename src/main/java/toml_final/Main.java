@@ -287,7 +287,7 @@ public class Main extends Application {
 
                 if (dx * dx + dy * dy <= 100) {
                     p.die();
-                    p.changeLevelScore(300);
+                    p.changeLevelScore(500);
                     break;
                 }
 
@@ -452,7 +452,7 @@ public class Main extends Application {
                 new toml_final.Platform(new Vector(350, 290), new Vector(50, 10), toml_final.Platform.Type.KILL),
                 new toml_final.Platform(new Vector(249, 210), new Vector(10, 200), toml_final.Platform.Type.STANDARD)
         };
-        Level l2 = new Level(4, l2_obs, new Vector(20, 190), new Vector(5, 322), new Vector(500, 322), new Rectangle2D(0, 0, 80, 400));
+        Level l2 = new Level(4, l2_obs, new Vector(230, 180), new Vector(5, 322), new Vector(500, 322), new Rectangle2D(0, 0, 80, 400));
 
         // Level 3: Vertical
         toml_final.Platform[] l3_obs = {

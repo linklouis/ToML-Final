@@ -68,7 +68,6 @@ public class Level {
 
     public Level getRandGoal() {
         return new Level(weight, platforms, new Vector(Math.random() * 600, Math.random()*300), spawnPos, alternateSpawn, null);
-
     }
 
     // --- Getters ---
