@@ -30,7 +30,7 @@ public class Main extends Application {
     private static final int HEIGHT = 400;
     private static final int INFO_PANE_HEIGHT = 15;
     private static final int NUM_FRAMES_TO_TRACK = 30;
-    private static final boolean FROM_FILE = false;
+    private static final boolean FROM_FILE = true;
 
     // Sim Constants
     private static final int MAX_STEPS_PER_LEVEL = 1100;
@@ -102,7 +102,7 @@ public class Main extends Application {
         stage.setScene(scene);
         stage.show();
 
-        stage.setOnCloseRequest(e -> {
+        stage.setOnCloseRequest(_ -> {
             running = false;
             physicsExecutor.shutdownNow();
             System.exit(0);
@@ -131,7 +131,7 @@ public class Main extends Application {
 
     private void initSimulation() {
         NeuralNetwork template = new NeuralNetwork(NUM_INPUTS);
-        template.newLayer(NUM_INPUTS, ActivationFunction.outputLimitedLeakyReLU());
+        template.newLayer(NUM_INPUTS*4/3, ActivationFunction.outputLimitedLeakyReLU());
         template.newLayer(2, n -> ActivationFunction.negativeInclusiveSigmoid().apply((float) (n * 1.4)));
 
         generation = new Generation(template, NUM_AGENTS, (int) (NUM_AGENTS*KEEP_RATE), MUTATION_CHANCE, MUTATION_SIZE);
@@ -198,6 +198,7 @@ public class Main extends Application {
                 try {
                     physicsExecutor.invokeAll(reusableTaskList);
                 } catch (InterruptedException e) {
+                    System.err.println("An issue occurred while invoking the task list in the physics loop.");
                     e.printStackTrace();
                 }
 
@@ -286,7 +287,7 @@ public class Main extends Application {
 
                 if (dx * dx + dy * dy <= 100) {
                     p.die();
-                    p.changeLevelScore(300);
+                    p.changeLevelScore(700 - 400.0*step/MAX_STEPS_PER_LEVEL);   // Encourage faster completions
                     break;
                 }
 
@@ -422,9 +423,6 @@ public class Main extends Application {
 
     private void createLevels() {
         levels = new ArrayList<>();
-        // ... (Your level creation code remains exactly the same) ...
-        // I omitted it here for brevity, paste your level creation code back in.
-        // COPY-PASTE YOUR CREATE LEVELS CODE HERE
 
         // Level 1
         toml_final.Platform[] l1_obs = {
@@ -454,7 +452,7 @@ public class Main extends Application {
                 new toml_final.Platform(new Vector(350, 290), new Vector(50, 10), toml_final.Platform.Type.KILL),
                 new toml_final.Platform(new Vector(249, 210), new Vector(10, 200), toml_final.Platform.Type.STANDARD)
         };
-        Level l2 = new Level(4, l2_obs, new Vector(20, 190), new Vector(5, 322), new Vector(500, 322), new Rectangle2D(0, 0, 80, 400));
+        Level l2 = new Level(4, l2_obs, new Vector(230, 180), new Vector(5, 322), new Vector(500, 322), new Rectangle2D(0, 0, 80, 400));
 
         // Level 3: Vertical
         toml_final.Platform[] l3_obs = {
@@ -526,42 +524,31 @@ public class Main extends Application {
 
 
         for (int i = 0; i < 2; i++) {
-            levels.add(l1);
-            levels.add(l1.getReversed(WIDTH));
+            addLevel(l1, false, false);
+            addLevel(l2, false, false);
+            addLevel(l3, false, true);
+            addLevel(l4, true, true);
+            addLevel(l4a, true, false);
+            addLevel(l4, true, false);
+            addLevel(l5, false, true);
+            addLevel(l6, true, true);
+        }
+    }
 
-            levels.add(l2);
-            levels.add(l2.getReversed(WIDTH));
-
-            levels.add(l3);
-            levels.add(l3.getReversed(WIDTH));
-            levels.add(l3.getRandGoal());
-            levels.add(l3.getReversed(WIDTH).getRandGoal());
-
-            levels.add(l4);
-            levels.add(l4.getReversed(WIDTH));
-            levels.add(l4.getAlt());
-            levels.add(l4.getReversed(WIDTH).getAlt());
-            levels.add(l4a);
-            levels.add(l4a.getReversed(WIDTH));
-            levels.add(l4a.getAlt());
-            levels.add(l4a.getReversed(WIDTH).getAlt());
-
-            levels.add(l4.getRandGoal());
-            levels.add(l4.getReversed(WIDTH).getRandGoal());
-            levels.add(l4.getAlt().getRandGoal());
-            levels.add(l4.getReversed(WIDTH).getAlt().getRandGoal());
-
-            levels.add(l5);
-            levels.add(l5.getReversed(WIDTH));
-            levels.add(l5.getRandGoal());
-            levels.add(l5.getReversed(WIDTH).getRandGoal());
-
-            levels.add(l6);
-            levels.add(l6.getReversed(WIDTH));
-            levels.add(l6.getAlt());
-            levels.add(l6.getReversed(WIDTH).getAlt());
-            levels.add(l6.getRandGoal());
-            levels.add(l6.getReversed(WIDTH).getRandGoal());
+    private void addLevel(Level level, boolean alt, boolean randomGoal) {
+        levels.add(level);
+        levels.add(level.getReversed(WIDTH));
+        if (alt){
+            levels.add(level.getAlt());
+            levels.add(level.getAlt().getReversed(WIDTH));
+            if (randomGoal){
+                levels.add(level.getAlt().getRandGoal());
+                levels.add(level.getAlt().getRandGoal().getReversed(WIDTH));
+            }
+        }
+        if (randomGoal){
+            levels.add(level.getRandGoal());
+            levels.add(level.getRandGoal().getReversed(WIDTH));
         }
     }
 
