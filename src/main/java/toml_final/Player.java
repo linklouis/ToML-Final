@@ -12,6 +12,10 @@ public class Player extends GameObj {
     private static final double MOVEMENT_THRESHOLD = 0.2;
     private static final double G = 9.8;
     private static final double JUMP_THRESHOLD = 0;
+    /**
+     * The number of times per second the agents would be able to take an
+     * action if the simulation were running in real-time
+     */
     private static final double UPSS = 60;
     private static final double MAX_RAY_DISTANCE = 500.0;
     private static final double JUMP_STRENGTH = 6;
