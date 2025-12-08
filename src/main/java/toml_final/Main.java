@@ -30,7 +30,7 @@ public class Main extends Application {
     private static final int HEIGHT = 400;
     private static final int INFO_PANE_HEIGHT = 15;
     private static final int NUM_FRAMES_TO_TRACK = 30;
-    private static final boolean FROM_FILE = false;
+    private static final boolean FROM_FILE = true;
 
     // Sim Constants
     private static final int MAX_STEPS_PER_LEVEL = 1100;
@@ -287,7 +287,7 @@ public class Main extends Application {
 
                 if (dx * dx + dy * dy <= 100) {
                     p.die();
-                    p.changeLevelScore(500);
+                    p.changeLevelScore(700 - 400.0*step/MAX_STEPS_PER_LEVEL);   // Encourage faster completions
                     break;
                 }
 
