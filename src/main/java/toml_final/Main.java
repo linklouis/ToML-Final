@@ -30,7 +30,7 @@ public class Main extends Application {
     private static final int HEIGHT = 400;
     private static final int INFO_PANE_HEIGHT = 15;
     private static final int NUM_FRAMES_TO_TRACK = 30;
-    private static final boolean FROM_FILE = false;
+    private static final boolean FROM_FILE = true;
 
     // Sim Constants
     private static final int MAX_STEPS_PER_LEVEL = 1100;
@@ -173,7 +173,7 @@ public class Main extends Application {
             // --- STEP LOOP ---
             while (currentStep < MAX_STEPS_PER_LEVEL && running) {
 
-                int stepsToRun = headlessMode ? (MAX_STEPS_PER_LEVEL - currentStep) : 1;
+                int stepsToRun = headlessMode ? (MAX_STEPS_PER_LEVEL - currentStep) : 2;
                 if (stepsToRun <= 0) stepsToRun = 1;
 
                 reusableTaskList.clear();
@@ -528,8 +528,7 @@ public class Main extends Application {
 //            addLevel(l2, false, false);
 //            addLevel(l3, false, true);
             addLevel(l4, true, true);
-            addLevel(l4a, true, false);
-            addLevel(l4, true, false);
+            addLevel(l4a, true, true);
 //            addLevel(l5, false, true);
 //            addLevel(l6, true, true);
         }
@@ -542,13 +541,23 @@ public class Main extends Application {
             levels.add(level.getAlt());
             levels.add(level.getAlt().getReversed(WIDTH));
             if (randomGoal){
-                levels.add(level.getAlt().getRandGoal());
-                levels.add(level.getAlt().getRandGoal().getReversed(WIDTH));
+                Level rand = level.getAlt().getRandGoal();
+                levels.add(rand);
+                levels.add(rand.getReversed(WIDTH));
+
+                rand = level.getAlt().getRandGoal();
+                levels.add(rand);
+                levels.add(rand.getReversed(WIDTH));
             }
         }
         if (randomGoal){
-            levels.add(level.getRandGoal());
-            levels.add(level.getRandGoal().getReversed(WIDTH));
+            Level rand = level.getRandGoal();
+            levels.add(rand);
+            levels.add(rand.getReversed(WIDTH));
+
+            rand = level.getRandGoal();
+            levels.add(rand);
+            levels.add(rand.getReversed(WIDTH));
         }
     }
 
