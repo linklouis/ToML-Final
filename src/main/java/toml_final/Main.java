@@ -30,7 +30,7 @@ public class Main extends Application {
     private static final int HEIGHT = 400;
     private static final int INFO_PANE_HEIGHT = 15;
     private static final int NUM_FRAMES_TO_TRACK = 30;
-    private static final boolean FROM_FILE = true;
+    private static final boolean FROM_FILE = false;
 
     // Sim Constants
     private static final int MAX_STEPS_PER_LEVEL = 1100;
