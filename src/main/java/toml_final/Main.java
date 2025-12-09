@@ -524,14 +524,14 @@ public class Main extends Application {
 
 
         for (int i = 0; i < 2; i++) {
-            addLevel(l1, false, false);
-            addLevel(l2, false, false);
-            addLevel(l3, false, true);
+//            addLevel(l1, false, false);
+//            addLevel(l2, false, false);
+//            addLevel(l3, false, true);
             addLevel(l4, true, true);
             addLevel(l4a, true, false);
             addLevel(l4, true, false);
-            addLevel(l5, false, true);
-            addLevel(l6, true, true);
+//            addLevel(l5, false, true);
+//            addLevel(l6, true, true);
         }
     }
 
